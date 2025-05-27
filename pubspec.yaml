@@ -1,0 +1,69 @@
+name: petopia
+description: A new Flutter project.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  flutter_svg: ^2.0.7
+  intl: ^0.20.2
+  image_picker: ^0.8.7+5
+  supabase_flutter: ^2.1.0
+  provider: ^6.1.1
+  http: ^1.1.0
+  shared_preferences: ^2.2.2
+  uuid: ^4.2.1
+  dotted_border: ^2.1.0
+  cached_network_image: ^3.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/images/icons/
+    - assets/images/products/
+    - assets/images/profile/
+    - assets/images/banners/
+    - assets/images/categories/
+    - assets/images/article/
+    - assets/images/kurir/
+
+  fonts:
+    - family: SF Pro Display
+      fonts:
+        - asset: assets/fonts/SF Pro/SF-Pro-Display-Regular.otf
+        - asset: assets/fonts/SF Pro/SF-Pro-Display-Bold.otf
+          weight: 700
+        - asset: assets/fonts/SF Pro/SF-Pro-Display-Light.otf
+          weight: 300
+        - asset: assets/fonts/SF Pro/SF-Pro-Display-Medium.otf
+          weight: 500
+        - asset: assets/fonts/SF Pro/SF-Pro-Display-Semibold.otf
+          weight: 600
+        - asset: assets/fonts/SF Pro/SF-Pro-Display-Black.otf
+          weight: 900
+
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins/Poppins-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Poppins/Poppins-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Poppins/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins/Poppins-SemiBold.ttf
+          weight: 600
+    - family: Notable
+      fonts:
+        - asset: assets/fonts/Notable/Notable-Regular.ttf
