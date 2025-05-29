@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../services/cart_service.dart';
+import '../services/order_service.dart';
+import '../services/checkout_service.dart';
+import '../services/auth_service.dart';
 import '../utils/colors.dart';
 import '../widgets/order_item.dart';
 import '../widgets/payment_method.dart';
-import '../services/checkout_service.dart';
-import '../models/order_model.dart';
-import '../services/auth_service.dart';
+import 'dart:async';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({Key? key}) : super(key: key);
@@ -14,123 +16,127 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  int selectedPaymentMethod = 0;
-  List<Map<String, dynamic>> _paymentMethods = [];
-  Map<String, dynamic>? _shippingAddress;
-  List<OrderItemModel> _orderItems = [];
   bool _isLoading = true;
-  String? _error;
-  double _subtotal = 0;
+  List<Map<String, dynamic>> _cartItems = [];
+  List<Map<String, dynamic>> _paymentMethods = [];
+  List<Map<String, dynamic>> _shippingMethods = [];
+  Map<String, dynamic>? _selectedPaymentMethod;
+  Map<String, dynamic>? _selectedShippingMethod;
+  Map<String, dynamic>? _shippingAddress;
+  String? _promoCode;
   double _shippingCost = 0;
   double _discountAmount = 0;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadCheckoutData();
-    });
+    _initializeCheckout();
   }
 
-  Future<void> _loadCheckoutData() async {
+  Future<void> _initializeCheckout() async {
+    setState(() => _isLoading = true);
     try {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
+      // Load cart items
+      final items = await CartService.getCartItems();
 
-      // Get current user
+      // Load payment methods
+      final paymentMethods = await CheckoutService.getPaymentMethods();
+
+      // Load shipping methods
+      final shippingMethods = await OrderService.getShippingMethods();
+
+      // Load default shipping address
       final userId = AuthService.getCurrentUserId();
-      if (userId == null) {
-        throw Exception('User not logged in');
+      if (userId != null) {
+        final address = await CheckoutService.getDefaultShippingAddress(userId);
+        if (address != null) {
+          _shippingAddress = address;
+        }
       }
-
-      // Get cart items from route arguments
-      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      if (args == null || args['items'] == null) {
-        throw Exception('No items to checkout');
-      }
-      
-      _orderItems = (args['items'] as List).cast<OrderItemModel>();
-
-      // Load data in parallel
-      final paymentMethodsFuture = CheckoutService.getPaymentMethods();
-      final addressFuture = CheckoutService.getDefaultShippingAddress(userId);
-      final shippingCostFuture = CheckoutService.calculateShippingCost(_orderItems);
-
-      // Wait for all futures to complete
-      final results = await Future.wait([
-        paymentMethodsFuture,
-        addressFuture,
-        shippingCostFuture,
-      ]);
 
       if (mounted) {
         setState(() {
-          _paymentMethods = results[0] as List<Map<String, dynamic>>;
-          _shippingAddress = results[1] as Map<String, dynamic>?;
-          _shippingCost = results[2] as double;
-
-          // Calculate totals
-          _subtotal = _orderItems.fold(
-            0, 
-            (sum, item) => sum + (item.price * item.quantity)
-          );
+          _cartItems = items;
+          _paymentMethods = paymentMethods;
+          _shippingMethods = shippingMethods;
+          if (_paymentMethods.isNotEmpty) {
+            _selectedPaymentMethod = _paymentMethods.first;
+          }
+          if (_shippingMethods.isNotEmpty) {
+            _selectedShippingMethod = _shippingMethods.first;
+            _shippingCost = _selectedShippingMethod!['base_cost'] ?? 0;
+          }
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('Error loading checkout data: $e');
       if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading checkout data: $e')),
+        );
       }
     }
   }
 
+  // Calculate subtotal
+  double get _subtotal {
+    return _cartItems.fold(0, (sum, item) =>
+    sum + (item['price'] as double) * (item['quantity'] as int));
+  }
+
+  // Calculate total
+  double get _total {
+    return _subtotal + _shippingCost - _discountAmount;
+  }
+
   Future<void> _processCheckout() async {
+    if (_selectedPaymentMethod == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a payment method')),
+      );
+      return;
+    }
+
+    if (_selectedShippingMethod == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a shipping method')),
+      );
+      return;
+    }
+
+    if (_shippingAddress == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add a shipping address')),
+      );
+      return;
+    }
+
     try {
       setState(() => _isLoading = true);
 
-      final userId = AuthService.getCurrentUserId();
-      if (userId == null) {
-        throw Exception('User not logged in');
-      }
-
-      if (_shippingAddress == null) {
-        throw Exception('Please select a shipping address');
-      }
-
-      if (_paymentMethods.isEmpty) {
-        throw Exception('No payment method selected');
-      }
-
-      // Create order
-      final order = await CheckoutService.createOrder(
-        userId: userId,
-        items: _orderItems,
+      final order = await OrderService.createOrder(
         shippingAddress: _shippingAddress!,
-        paymentMethodId: _paymentMethods[selectedPaymentMethod]['id'],
+        paymentMethodId: _selectedPaymentMethod!['id'],
+        shippingMethodId: _selectedShippingMethod!['id'],
+        promoCode: _promoCode,
       );
 
       if (mounted) {
-        // Navigate to payment screen with order details
-        Navigator.of(context).pushReplacementNamed(
-          '/payment',
-          arguments: {'orderId': order.id},
+        // Navigate to order success page
+        Navigator.pushReplacementNamed(
+          context,
+          '/order-success',
+          arguments: order,
         );
       }
     } catch (e) {
-      print('Error processing checkout: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Checkout failed: $e')),
         );
+      }
+    } finally {
+      if (mounted) {
         setState(() => _isLoading = false);
       }
     }
@@ -140,27 +146,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (_error != null) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(_error!),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadCheckoutData,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -194,16 +180,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Shipping Address Card
                     _buildShippingAddressCard(),
+
+                    // Order Items Section
                     _buildOrderItemsSection(),
+
+                    // Payment Methods Section
                     _buildPaymentMethodsSection(),
+
+                    // Order Summary Section
                     _buildOrderSummarySection(),
+
                     const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
           ),
+
+          // Fixed payment button at bottom
           _buildPaymentButton(),
         ],
       ),
@@ -211,39 +207,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildShippingAddressCard() {
-    if (_shippingAddress == null) {
-      return Card(
-        margin: const EdgeInsets.symmetric(vertical: 16),
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.grey.shade200),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              const Text(
-                'No shipping address found',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'SF Pro Display',
-                ),
-              ),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pushNamed('/address-list');
-                },
-                child: const Text('Add Address'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 16),
       elevation: 0,
@@ -281,13 +244,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.location_on, color: AppColors.primaryColor, size: 20),
-                const SizedBox(width: 8),
+                Icon(Icons.location_on, color: AppColors.primaryColor, size: 20),
+                SizedBox(width: 8),
                 Text(
-                  '${_shippingAddress!['label']} - ${_shippingAddress!['recipient_name']}',
-                  style: const TextStyle(
+                  'Rumah - Abim',
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     fontFamily: 'SF Pro Display',
@@ -296,12 +259,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              _shippingAddress!['address'],
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-                fontFamily: 'SF Pro Display',
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'assets/images/map.png',
+                width: double.infinity,
+                height: 120,
+                fit: BoxFit.cover,
               ),
             ),
           ],
@@ -333,19 +297,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const SizedBox(height: 16),
 
-            ..._orderItems.map((item) => Column(
+            // Order items list
+            ..._cartItems.map((item) => Column(
               children: [
                 OrderItemWidget(
-                  storeName: item.storeName ?? '',
-                  productImages: [item.productImage ?? ''],
-                  productName: item.productName ?? '',
-                  productVariant: item.variant ?? '',
-                  price: 'Rp${item.price.toStringAsFixed(0)}',
-                  quantity: item.quantity,
+                  storeName: item['store_name'],
+                  productImages: [item['image']],
+                  productName: item['name'],
+                  productVariant: item['variant'] ?? '',
+                  price: 'Rp${item['price'].toStringAsFixed(0)}',
+                  quantity: item['quantity'],
                   isSmallScreen: true,
                   onAddNote: () {},
                 ),
-                if (item != _orderItems.last)
+                if (item != _cartItems.last)
                   const Divider(height: 24, thickness: 1),
               ],
             )).toList(),
@@ -392,6 +357,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const SizedBox(height: 12),
 
+            // Payment methods list
             ..._paymentMethods.asMap().entries.map((entry) {
               final index = entry.key;
               final method = entry.value;
@@ -400,10 +366,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: PaymentMethodWidget(
                   logoUrl: method['logo_url'],
                   name: method['name'],
-                  isSelected: selectedPaymentMethod == index,
+                  isSelected: _selectedPaymentMethod == method,
                   onTap: () {
                     setState(() {
-                      selectedPaymentMethod = index;
+                      _selectedPaymentMethod = method;
                     });
                   },
                 ),
@@ -416,8 +382,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildOrderSummarySection() {
-    final totalAmount = _subtotal + _shippingCost - _discountAmount;
-
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
@@ -440,11 +404,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const SizedBox(height: 12),
 
+            // Summary rows
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Total Harga (${_orderItems.length} Barang)',
+                  'Total Harga (${_cartItems.length} Barang)',
                   style: const TextStyle(
                     fontSize: 14,
                     color: Color(0xFF7B7B7B),
@@ -520,7 +485,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 Text(
-                  'Rp${totalAmount.toStringAsFixed(0)}',
+                  'Rp${_total.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -564,21 +529,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           child: _isLoading
               ? const CircularProgressIndicator(color: Colors.white)
-              : const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.payment_rounded, size: 24),
-                    SizedBox(width: 12),
-                    Text(
-                      'Bayar Sekarang',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'SF Pro Display',
-                      ),
-                    ),
-                  ],
+              : Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.payment_rounded, size: 24),
+              const SizedBox(width: 12),
+              const Text(
+                'Bayar Sekarang',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'SF Pro Display',
                 ),
+              ),
+            ],
+          ),
         ),
       ),
     );
