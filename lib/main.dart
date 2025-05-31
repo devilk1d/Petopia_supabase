@@ -80,7 +80,7 @@ class MyApp extends StatelessWidget {
         '/user-profile': (context) => const UserProfile(),
         '/store-profile': (context) => const StoreProfile(),
         '/address-list': (context) => const AddressListScreen(),
-        '/address-edit': (context) => const AddressDataScreen(),
+        '/address-edit': (context) => const AddressFormScreen(),
         '/article-detail': (context) => const ArticleDetailPage(),
         '/register-toko': (context) => const RegisterTokoScreen(),
         '/complaint': (context) => const ComplaintScreen(),

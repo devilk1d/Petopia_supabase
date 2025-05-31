@@ -1,36 +1,138 @@
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
+import '../models/address_model.dart';
+import '../services/address_service.dart';
+import '../services/auth_service.dart';
 
-class AddressDataScreen extends StatefulWidget {
-  const AddressDataScreen({Key? key}) : super(key: key);
+class AddressFormScreen extends StatefulWidget {
+  final AddressModel? address;
+
+  const AddressFormScreen({Key? key, this.address}) : super(key: key);
 
   @override
-  State<AddressDataScreen> createState() => _AddressDataScreenState();
+  State<AddressFormScreen> createState() => _AddressFormScreenState();
 }
 
-class _AddressDataScreenState extends State<AddressDataScreen> {
-  // Controller for text fields
-  final TextEditingController _addressNameController = TextEditingController();
-  final TextEditingController _phoneNumberController = TextEditingController();
-  final TextEditingController _postalCodeController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
+class _AddressFormScreenState extends State<AddressFormScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _labelController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _postalCodeController = TextEditingController();
 
-  // City selection
   String _selectedCity = '';
+  bool _isDefault = false;
+  bool _isLoading = false;
+
+  final List<String> _cities = [
+    'Jakarta Pusat', 'Jakarta Utara', 'Jakarta Selatan', 'Jakarta Timur', 'Jakarta Barat',
+    'Bandung', 'Surabaya', 'Medan', 'Makassar', 'Semarang', 'Yogyakarta', 'Palembang',
+    'Tangerang', 'Depok', 'Bekasi', 'Bogor', 'Malang', 'Solo', 'Balikpapan', 'Banjarmasin'
+  ];
+
+  final List<Map<String, dynamic>> _labelOptions = [
+    {'label': 'Rumah', 'icon': Icons.home_rounded},
+    {'label': 'Kantor', 'icon': Icons.work_rounded},
+    {'label': 'Apartemen', 'icon': Icons.apartment_rounded},
+    {'label': 'Kos', 'icon': Icons.bed_rounded},
+    {'label': 'Lainnya', 'icon': Icons.location_on_rounded},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.address != null) {
+      _populateFields();
+    }
+  }
+
+  void _populateFields() {
+    final address = widget.address!;
+    _labelController.text = address.label;
+    _nameController.text = address.recipientName;
+    _phoneController.text = address.phone;
+    _addressController.text = address.address;
+    _postalCodeController.text = address.postalCode;
+    _selectedCity = address.city;
+    _isDefault = address.isDefault;
+  }
 
   @override
   void dispose() {
-    _addressNameController.dispose();
-    _phoneNumberController.dispose();
-    _postalCodeController.dispose();
+    _labelController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
     _addressController.dispose();
+    _postalCodeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveAddress() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedCity.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih kota terlebih dahulu')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
+      final addressData = AddressModel(
+        id: widget.address?.id ?? '',
+        userId: userId,
+        label: _labelController.text.trim(),
+        recipientName: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
+        city: _selectedCity,
+        postalCode: _postalCodeController.text.trim(),
+        isDefault: _isDefault,
+        createdAt: widget.address?.createdAt ?? DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      if (widget.address != null) {
+        await AddressService.updateAddress(addressData);
+      } else {
+        await AddressService.addAddress(addressData);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                widget.address != null
+                    ? 'Alamat berhasil diperbarui'
+                    : 'Alamat berhasil ditambahkan'
+            ),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         surfaceTintColor: Colors.transparent,
         backgroundColor: Colors.white,
@@ -39,584 +141,436 @@ class _AddressDataScreenState extends State<AddressDataScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.primaryColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Data Alamat',
-          style: TextStyle(
+        title: Text(
+          widget.address != null ? 'Edit Alamat' : 'Tambah Alamat',
+          style: const TextStyle(
             fontFamily: 'SF Pro Display',
-            fontSize: 20,
+            fontSize: 18,
             fontWeight: FontWeight.w600,
             color: Colors.black,
           ),
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Avatar selection card
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: Colors.grey.shade200),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Row(
-                    children: [
-                      // Camera icon in circle
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFB60051),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      // Text content
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Pilih Avatar',
-                              style: TextStyle(
-                                fontFamily: 'SF Pro Display',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Bisa emoji ataupun foto',
-                              style: TextStyle(
-                                fontFamily: 'SF Pro Display',
-                                fontSize: 14,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Forward arrow
-                      const Icon(
-                        Icons.chevron_right,
-                        color: Colors.grey,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Address name field
-              const Text(
-                'Nama Alamat',
-                style: TextStyle(
-                  fontFamily: 'SF Pro Display',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _addressNameController,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: const Color(0xFFF5F5F5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                  hintText: 'Rumah, Kantor, dll',
-                  hintStyle: TextStyle(
-                    fontFamily: 'SF Pro Display',
-                    color: Colors.grey.shade500,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                ),
-                style: const TextStyle(fontFamily: 'SF Pro Display'),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Phone and postal code in row
-              Row(
-                children: [
-                  // Phone number field
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'No. Handphone',
-                          style: TextStyle(
-                            fontFamily: 'SF Pro Display',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _phoneNumberController,
-                          keyboardType: TextInputType.phone,
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: const Color(0xFFF5F5F5),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                            hintText: '08xxxxxxxxxx',
-                            hintStyle: TextStyle(
-                              fontFamily: 'SF Pro Display',
-                              color: Colors.grey.shade500,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          ),
-                          style: const TextStyle(fontFamily: 'SF Pro Display'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Postal code field
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Kode Pos',
-                          style: TextStyle(
-                            fontFamily: 'SF Pro Display',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _postalCodeController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: const Color(0xFFF5F5F5),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                            hintText: '12345',
-                            hintStyle: TextStyle(
-                              fontFamily: 'SF Pro Display',
-                              color: Colors.grey.shade500,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          ),
-                          style: const TextStyle(fontFamily: 'SF Pro Display'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // City dropdown
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Kota',
-                    style: TextStyle(
-                      fontFamily: 'SF Pro Display',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: InkWell(
-                      onTap: () {
-                        // Show city selection dialog/sheet
-                        showModalBottomSheet(
-                          context: context,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                          ),
-                          builder: (BuildContext context) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(vertical: 20),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text(
-                                    'Pilih Kota',
-                                    style: TextStyle(
-                                      fontFamily: 'SF Pro Display',
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Expanded(
-                                    child: ListView(
-                                      children: <String>[
-                                        'Jakarta',
-                                        'Surabaya',
-                                        'Bandung',
-                                        'Medan',
-                                        'Makassar',
-                                        'Semarang',
-                                        'Yogyakarta',
-                                        'Palembang'
-                                      ].map((String value) {
-                                        return ListTile(
-                                          title: Text(
-                                            value,
-                                            style: const TextStyle(fontFamily: 'SF Pro Display'),
-                                          ),
-                                          onTap: () {
-                                            Navigator.pop(context);
-                                            // Update selected city
-                                            setState(() {
-                                              _selectedCity = value;
-                                            });
-                                          },
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _selectedCity.isEmpty ? 'Pilih kota anda tinggal' : _selectedCity,
-                              style: TextStyle(
-                                fontFamily: 'SF Pro Display',
-                                color: _selectedCity.isEmpty ? Colors.grey.shade600 : Colors.black,
-                                fontSize: 14,
-                              ),
-                            ),
-                            Icon(
-                              Icons.keyboard_arrow_down,
-                              color: Colors.grey.shade600,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // Detailed address
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Alamat',
-                    style: TextStyle(
-                      fontFamily: 'SF Pro Display',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _addressController,
-                    maxLines: 5,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFFF5F5F5),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                      hintText: 'Masukkan alamat lengkap',
-                      hintStyle: TextStyle(
-                        fontFamily: 'SF Pro Display',
-                        color: Colors.grey.shade500,
-                      ),
-                      contentPadding: const EdgeInsets.all(16),
-                    ),
-                    style: const TextStyle(fontFamily: 'SF Pro Display'),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // Pilih lokasi
-              const Text(
-                'Pilih lokasi',
-                style: TextStyle(
-                  fontFamily: 'SF Pro Display',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Map placeholder
-              Container(
-                height: 240,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Stack(
+      body: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Static map image placeholder
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(11),
-                      child: Image.asset(
-                        'assets/images/map.png',
-                        width: double.infinity,
-                        height: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.map,
-                                  size: 48,
-                                  color: Colors.grey.shade400,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Peta tidak tersedia',
-                                  style: TextStyle(
-                                    fontFamily: 'SF Pro Display',
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Tambahkan gambar map_placeholder.png di assets',
-                                  style: TextStyle(
-                                    fontFamily: 'SF Pro Display',
-                                    fontSize: 12,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                    // Label selection
+                    _buildSectionTitle('Label Alamat'),
+                    const SizedBox(height: 8),
+                    _buildLabelSelection(),
+
+                    const SizedBox(height: 24),
+
+                    // Recipient info
+                    _buildSectionTitle('Informasi Penerima'),
+                    const SizedBox(height: 8),
+                    _buildTextField(
+                      controller: _nameController,
+                      label: 'Nama Penerima',
+                      hint: 'Masukkan nama lengkap',
+                      validator: (value) {
+                        if (value?.isEmpty == true) return 'Nama tidak boleh kosong';
+                        if (value!.length < 2) return 'Nama minimal 2 karakter';
+                        return null;
+                      },
                     ),
-                    // Location marker in center
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFB60051).withOpacity(0.8),
-                          shape: BoxShape.circle,
+
+                    const SizedBox(height: 16),
+
+                    _buildTextField(
+                      controller: _phoneController,
+                      label: 'Nomor Telepon',
+                      hint: '08xxxxxxxxxx',
+                      keyboardType: TextInputType.phone,
+                      validator: (value) {
+                        if (value?.isEmpty == true) return 'Nomor telepon tidak boleh kosong';
+                        // Fixed regex pattern - added missing $
+                        if (!RegExp(r'^08[0-9]{8,11}$').hasMatch(value!)) {
+                          return 'Format nomor telepon tidak valid (08xxxxxxxxxx)';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Address details
+                    _buildSectionTitle('Detail Alamat'),
+                    const SizedBox(height: 8),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: _buildCityDropdown(),
                         ),
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 24,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _postalCodeController,
+                            label: 'Kode Pos',
+                            hint: '12345',
+                            keyboardType: TextInputType.number,
+                            validator: (value) {
+                              if (value?.isEmpty == true) return 'Kode pos wajib diisi';
+                              if (value!.length != 5) return 'Kode pos harus 5 digit';
+                              if (!RegExp(r'^[0-9]+$').hasMatch(value)) return 'Kode pos hanya boleh angka';
+                              return null;
+                            },
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    // Controls
-                    Positioned(
-                      right: 10,
-                      bottom: 10,
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.add,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.remove,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
+
+                    const SizedBox(height: 16),
+
+                    _buildTextField(
+                      controller: _addressController,
+                      label: 'Alamat Lengkap',
+                      hint: 'Jalan, nomor rumah, RT/RW, kelurahan...',
+                      maxLines: 4,
+                      validator: (value) {
+                        if (value?.isEmpty == true) return 'Alamat tidak boleh kosong';
+                        if (value!.length < 10) return 'Alamat terlalu pendek';
+                        return null;
+                      },
                     ),
+
+                    const SizedBox(height: 24),
+
+                    // Default address option
+                    _buildDefaultOption(),
+
+                    const SizedBox(height: 100), // Space for FAB
                   ],
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _isLoading ? null : _saveAddress,
+        backgroundColor: _isLoading ? Colors.grey : AppColors.primaryColor,
+        icon: _isLoading
+            ? const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        )
+            : const Icon(Icons.save, color: Colors.white),
+        label: Text(
+          _isLoading ? 'Menyimpan...' : 'Simpan Alamat',
+          style: const TextStyle(
+            fontFamily: 'SF Pro Display',
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
 
-              const SizedBox(height: 16),
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontFamily: 'SF Pro Display',
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: Colors.black87,
+      ),
+    );
+  }
 
-              // Use my current location
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: Colors.grey.shade200),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
+  Widget _buildLabelSelection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Custom label input
+          TextFormField(
+            controller: _labelController,
+            decoration: InputDecoration(
+              labelText: 'Label Alamat',
+              hintText: 'atau pilih dari opsi di bawah',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.primaryColor),
+              ),
+              labelStyle: TextStyle(
+                fontFamily: 'SF Pro Display',
+                color: Colors.grey[600],
+              ),
+              hintStyle: TextStyle(
+                fontFamily: 'SF Pro Display',
+                color: Colors.grey[400],
+              ),
+            ),
+            style: const TextStyle(fontFamily: 'SF Pro Display'),
+            validator: (value) => value?.isEmpty == true ? 'Label alamat tidak boleh kosong' : null,
+          ),
+
+          const SizedBox(height: 16),
+
+          // Predefined labels
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _labelOptions.map((option) {
+              final isSelected = _labelController.text == option['label'];
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _labelController.text = option['label'];
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primaryColor : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primaryColor : Colors.grey[300]!,
+                    ),
+                  ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Location icon in circle
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFB60051),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 24,
-                        ),
+                      Icon(
+                        option['icon'],
+                        size: 16,
+                        color: isSelected ? Colors.white : Colors.grey[600],
                       ),
-                      const SizedBox(width: 16),
-                      // Text content
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Gunakan lokasi saya saat ini',
-                              style: TextStyle(
-                                fontFamily: 'SF Pro Display',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Jl. Mohammad Kahfi II Gg.Jambu No.123...',
-                              style: TextStyle(
-                                fontFamily: 'SF Pro Display',
-                                fontSize: 14,
-                                color: Colors.grey,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                      const SizedBox(width: 6),
+                      Text(
+                        option['label'],
+                        style: TextStyle(
+                          fontFamily: 'SF Pro Display',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: isSelected ? Colors.white : Colors.grey[700],
                         ),
-                      ),
-                      // Forward arrow
-                      const Icon(
-                        Icons.chevron_right,
-                        color: Colors.grey,
                       ),
                     ],
                   ),
                 ),
-              ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
 
-              const SizedBox(height: 36),
-
-              // Save button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Save address logic
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Alamat berhasil disimpan',
-                          style: TextStyle(fontFamily: 'SF Pro Display'),
-                        ),
-                        backgroundColor: Color(0xFFB60051),
-                      ),
-                    );
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFB60051),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Simpan Alamat',
-                    style: TextStyle(
-                      fontFamily: 'SF Pro Display',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-            ],
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.primaryColor, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red, width: 1),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.all(16),
+          labelStyle: TextStyle(
+            fontFamily: 'SF Pro Display',
+            color: Colors.grey[600],
+          ),
+          hintStyle: TextStyle(
+            fontFamily: 'SF Pro Display',
+            color: Colors.grey[400],
           ),
         ),
+        style: const TextStyle(fontFamily: 'SF Pro Display'),
+      ),
+    );
+  }
+
+  Widget _buildCityDropdown() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: DropdownButtonFormField<String>(
+        value: _selectedCity.isEmpty ? null : _selectedCity,
+        decoration: InputDecoration(
+          labelText: 'Kota',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.primaryColor, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red, width: 1),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.all(16),
+          labelStyle: TextStyle(
+            fontFamily: 'SF Pro Display',
+            color: Colors.grey[600],
+          ),
+        ),
+        hint: const Text(
+          'Pilih kota',
+          style: TextStyle(
+            fontFamily: 'SF Pro Display',
+            color: Colors.grey,
+          ),
+        ),
+        items: _cities.map((city) {
+          return DropdownMenuItem(
+            value: city,
+            child: Text(
+              city,
+              style: const TextStyle(fontFamily: 'SF Pro Display'),
+            ),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() {
+            _selectedCity = value ?? '';
+          });
+        },
+        validator: (value) => value == null ? 'Pilih kota' : null,
+        icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey[600]),
+        isExpanded: true,
+      ),
+    );
+  }
+
+  Widget _buildDefaultOption() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            child: Icon(
+              Icons.star_rounded,
+              color: _isDefault ? AppColors.primaryColor : Colors.grey[400],
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Jadikan alamat utama',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  'Alamat ini akan diprioritaskan saat checkout',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _isDefault,
+            onChanged: (value) {
+              setState(() {
+                _isDefault = value;
+              });
+            },
+            activeColor: AppColors.primaryColor,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ],
       ),
     );
   }

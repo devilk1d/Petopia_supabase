@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:async';
 import '../widgets/countdown_timer.dart';
 import '../utils/colors.dart';
+import '../services/order_service.dart';
 
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({Key? key}) : super(key: key);
@@ -15,6 +15,13 @@ class _PaymentScreenState extends State<PaymentScreen> with SingleTickerProvider
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   bool _isCopied = false;
+  bool _isConfirmingPayment = false;
+
+  // Order data from arguments
+  String? _orderId;
+  String? _orderNumber;
+  double? _totalAmount;
+  Map<String, dynamic>? _paymentMethod;
 
   @override
   void initState() {
@@ -36,13 +43,20 @@ class _PaymentScreenState extends State<PaymentScreen> with SingleTickerProvider
 
     // Start animation
     _animationController.forward();
+  }
 
-    // Automatically navigate to success screen after 5 seconds
-    Timer(const Duration(seconds: 10), () {
-      if (mounted) {
-        Navigator.of(context).pushNamed('/payment-success');
-      }
-    });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Get arguments from navigation
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (args != null) {
+      _orderId = args['orderId'];
+      _orderNumber = args['orderNumber'];
+      _totalAmount = args['totalAmount'];
+      _paymentMethod = args['paymentMethod'];
+    }
   }
 
   @override
@@ -83,7 +97,7 @@ class _PaymentScreenState extends State<PaymentScreen> with SingleTickerProvider
     );
 
     // Reset copied state after animation
-    Timer(const Duration(milliseconds: 2000), () {
+    Future.delayed(const Duration(milliseconds: 2000), () {
       if (mounted) {
         setState(() {
           _isCopied = false;
@@ -92,115 +106,176 @@ class _PaymentScreenState extends State<PaymentScreen> with SingleTickerProvider
     });
   }
 
+  Future<void> _confirmPayment() async {
+    if (_orderId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: Order ID tidak ditemukan'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isConfirmingPayment = true;
+    });
+
+    try {
+      // Update payment status to paid
+      await OrderService.updatePaymentStatus(_orderId!, 'paid');
+
+      if (mounted) {
+        // Navigate to success screen
+        Navigator.pushReplacementNamed(
+          context,
+          '/payment-success',
+          arguments: {
+            'orderId': _orderId,
+            'orderNumber': _orderNumber,
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isConfirmingPayment = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error konfirmasi pembayaran: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<bool> _onWillPop() async {
+    // Update order status to processing when user closes payment screen
+    if (_orderId != null) {
+      try {
+        await OrderService.updateOrderStatus(_orderId!, 'processing');
+      } catch (e) {
+        print('Error updating order status: $e');
+      }
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.primaryColor,
-      appBar: AppBar(
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
         backgroundColor: AppColors.primaryColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Colors.white,
-            size: 20,
+        appBar: AppBar(
+          backgroundColor: AppColors.primaryColor,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Colors.white,
+              size: 20,
+            ),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
           ),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-        ),
-        title: const Text(
-          'Pembayaran',
-          style: TextStyle(
-            fontFamily: 'SF Pro Display',
-            fontSize: 20,
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
+          title: const Text(
+            'Pembayaran',
+            style: TextStyle(
+              fontFamily: 'SF Pro Display',
+              fontSize: 20,
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
           ),
+          centerTitle: true,
         ),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Clock icon with animation
-                AnimatedBuilder(
-                  animation: _scaleAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _scaleAnimation.value,
-                      child: child,
-                    );
-                  },
-                  child: Container(
-                    width: 180,
-                    height: 180,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.white.withOpacity(0.3),
-                          blurRadius: 30,
-                          spreadRadius: 5,
-                          offset: const Offset(0, 0),
+        body: Column(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Clock icon with animation
+                  AnimatedBuilder(
+                    animation: _scaleAnimation,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _scaleAnimation.value,
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      width: 180,
+                      height: 180,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withOpacity(0.3),
+                            blurRadius: 30,
+                            spreadRadius: 5,
+                            offset: const Offset(0, 0),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Image.asset(
+                          'assets/images/icons/uim_clock.png',
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(
+                              Icons.access_time,
+                              size: 80,
+                              color: AppColors.primaryColor,
+                            );
+                          },
                         ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Image.asset(
-                        'assets/images/icons/uim_clock.png',
-                        width: 100,
-                        height: 100,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Icons.access_time,
-                            size: 80,
-                            color: AppColors.primaryColor,
-                          );
-                        },
                       ),
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 30),
+                  const SizedBox(height: 30),
 
-                // Countdown title and timer
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 40),
-                  child: Text(
-                    'SEGERA LAKUKAN PEMBAYARAN DALAM WAKTU',
-                    style: TextStyle(
-                      fontFamily: 'SF Pro Display',
-                      fontSize: 14,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
+                  // Countdown title and timer
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 40),
+                    child: Text(
+                      'SEGERA LAKUKAN PEMBAYARAN DALAM WAKTU',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro Display',
+                        fontSize: 14,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                ),
 
-                const SizedBox(height: 10),
+                  const SizedBox(height: 10),
 
-                // Countdown timer
-                const CountdownTimer(
-                  hours: 23,
-                  minutes: 59,
-                  seconds: 33,
-                ),
-              ],
+                  // Countdown timer
+                  const CountdownTimer(
+                    hours: 23,
+                    minutes: 59,
+                    seconds: 33,
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // Bottom payment information card
-          _buildPaymentInfoCard(),
-        ],
+            // Bottom payment information card
+            _buildPaymentInfoCard(),
+          ],
+        ),
       ),
     );
   }
@@ -226,6 +301,30 @@ class _PaymentScreenState extends State<PaymentScreen> with SingleTickerProvider
       ),
       child: Column(
         children: [
+          // Order number
+          if (_orderNumber != null) ...[
+            Text(
+              'Nomor Pesanan',
+              style: TextStyle(
+                fontFamily: 'SF Pro Display',
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _orderNumber!,
+              style: const TextStyle(
+                fontFamily: 'SF Pro Display',
+                fontSize: 16,
+                color: Colors.black87,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+
           // Payment amount
           const Text(
             'Jumlah yang harus dibayarkan',
@@ -237,9 +336,9 @@ class _PaymentScreenState extends State<PaymentScreen> with SingleTickerProvider
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Rp3.205.328',
-            style: TextStyle(
+          Text(
+            'Rp${_formatPrice(_totalAmount ?? 0)}',
+            style: const TextStyle(
               fontFamily: 'SF Pro Display',
               fontSize: 32,
               color: AppColors.primaryColor,
@@ -272,7 +371,7 @@ class _PaymentScreenState extends State<PaymentScreen> with SingleTickerProvider
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Image.asset(
-                  'assets/images/bca.png',
+                  _paymentMethod?['logo_url'] ?? 'assets/images/bca.png',
                   width: 60,
                   height: 25,
                   fit: BoxFit.contain,
@@ -281,10 +380,10 @@ class _PaymentScreenState extends State<PaymentScreen> with SingleTickerProvider
                       width: 60,
                       height: 25,
                       color: Colors.grey[200],
-                      child: const Center(
+                      child: Center(
                         child: Text(
-                          'BCA',
-                          style: TextStyle(
+                          _paymentMethod?['name']?.split(' ')[0] ?? 'BANK',
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
@@ -355,8 +454,85 @@ class _PaymentScreenState extends State<PaymentScreen> with SingleTickerProvider
               ),
             ),
           ),
+
+          const SizedBox(height: 20),
+
+          // Confirm payment button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isConfirmingPayment ? null : _confirmPayment,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isConfirmingPayment ? Colors.grey : AppColors.success,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
+              ),
+              child: _isConfirmingPayment
+                  ? const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    'Memproses...',
+                    style: TextStyle(
+                      fontFamily: 'SF Pro Display',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              )
+                  : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text(
+                    'Konfirmasi Pembayaran',
+                    style: TextStyle(
+                      fontFamily: 'SF Pro Display',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Info text
+          Text(
+            'Klik tombol di atas setelah melakukan transfer',
+            style: TextStyle(
+              fontFamily: 'SF Pro Display',
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
+    );
+  }
+
+  String _formatPrice(double price) {
+    return price.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
     );
   }
 }

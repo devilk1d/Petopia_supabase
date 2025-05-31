@@ -52,24 +52,28 @@ class OrderService {
 
       final totalAmount = subtotal - discountAmount + shippingCost;
 
-      // Create order
+      // Create order dengan explicit user_id
+      final orderData = {
+        'user_id': userId,
+        'total_amount': totalAmount,
+        'shipping_cost': shippingCost,
+        'discount_amount': discountAmount,
+        'payment_method_id': paymentMethodId,
+        'shipping_method_id': shippingMethodId,
+        'shipping_address': shippingAddress,
+        'status': 'pending_payment',
+        'payment_status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      // Add optional fields if they exist
+      if (promoId != null) orderData['promo_id'] = promoId;
+      if (notes != null && notes.isNotEmpty) orderData['notes'] = notes;
+
       final orderResponse = await _client
           .from('orders')
-          .insert({
-            'user_id': userId,
-            'total_amount': totalAmount,
-            'shipping_cost': shippingCost,
-            'discount_amount': discountAmount,
-            'promo_id': promoId,
-            'payment_method_id': paymentMethodId,
-            'shipping_method_id': shippingMethodId,
-            'shipping_address': shippingAddress,
-            'notes': notes,
-            'status': 'pending_payment',
-            'payment_status': 'pending',
-            'created_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
+          .insert(orderData)
           .select()
           .single();
 
@@ -80,14 +84,14 @@ class OrderService {
         await _client
             .from('order_items')
             .insert({
-              'order_id': orderId,
-              'product_id': cartItem['product_id'],
-              'seller_id': cartItem['seller_id'],
-              'quantity': cartItem['quantity'],
-              'price': cartItem['price'],
-              'variant': cartItem['variant'] ?? '',
-              'created_at': DateTime.now().toIso8601String(),
-            });
+          'order_id': orderId,
+          'product_id': cartItem['product_id'],
+          'seller_id': cartItem['seller_id'],
+          'quantity': cartItem['quantity'],
+          'price': cartItem['price'],
+          'variant': cartItem['variant'] ?? '',
+          'created_at': DateTime.now().toIso8601String(),
+        });
       }
 
       // Use promo code if applied
@@ -100,7 +104,18 @@ class OrderService {
 
       return orderResponse;
     } catch (e) {
-      throw Exception('Failed to create order: $e');
+      print('Order creation error: $e'); // For debugging
+
+      // Handle specific database errors
+      if (e.toString().contains('new row violates row-level security policy')) {
+        throw Exception('Permission denied: Unable to create order. Please login again.');
+      } else if (e.toString().contains('violates foreign key constraint')) {
+        throw Exception('Invalid data: Some referenced data is missing.');
+      } else if (e.toString().contains('violates check constraint')) {
+        throw Exception('Invalid data: Please check your order details.');
+      } else {
+        throw Exception('Failed to create order: $e');
+      }
     }
   }
 
@@ -118,6 +133,8 @@ class OrderService {
           .from('orders')
           .select('''
             *,
+            payment_methods(id, name, type, logo_url),
+            shipping_methods(id, name, type, logo_url),
             order_items (
               *,
               products (
@@ -149,7 +166,7 @@ class OrderService {
           order['order_items'] = (order['order_items'] as List).map((item) {
             final product = item['products'];
             final seller = product['sellers'];
-            
+
             return {
               'id': item['id'],
               'order_id': item['order_id'],
@@ -177,7 +194,7 @@ class OrderService {
     }
   }
 
-  // Get order by ID
+  // Get order by ID with complete details
   static Future<Map<String, dynamic>?> getOrderById(String orderId) async {
     try {
       final userId = AuthService.getCurrentUserId();
@@ -187,6 +204,9 @@ class OrderService {
           .from('orders')
           .select('''
             *,
+            payment_methods(id, name, type, logo_url),
+            shipping_methods(id, name, type, logo_url, base_cost),
+            promos(id, code, title, discount_type, discount_value),
             order_items (
               *,
               products (
@@ -194,11 +214,13 @@ class OrderService {
                 name,
                 price,
                 images,
+                description,
                 seller_id,
                 sellers (
                   id,
                   store_name,
-                  store_image_url
+                  store_image_url,
+                  store_description
                 )
               )
             )
@@ -214,7 +236,7 @@ class OrderService {
         response['order_items'] = (response['order_items'] as List).map((item) {
           final product = item['products'];
           final seller = product['sellers'];
-          
+
           return {
             'id': item['id'],
             'order_id': item['order_id'],
@@ -228,9 +250,11 @@ class OrderService {
               'name': product['name'],
               'price': (product['price'] as num).toDouble(),
               'image_url': (product['images'] as List).isNotEmpty ? product['images'][0] : null,
+              'description': product['description'],
               'seller_id': product['seller_id'],
               'seller_store_name': seller['store_name'],
               'seller_store_image': seller['store_image_url'],
+              'seller_store_description': seller['store_description'],
             },
           };
         }).toList();
@@ -238,6 +262,7 @@ class OrderService {
 
       return response;
     } catch (e) {
+      print('Error fetching order by ID: $e');
       return null;
     }
   }
@@ -245,10 +270,17 @@ class OrderService {
   // Update order status
   static Future<void> updateOrderStatus(String orderId, String status) async {
     try {
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
       await _client
           .from('orders')
-          .update({'status': status})
-          .eq('id', orderId);
+          .update({
+        'status': status,
+        'updated_at': DateTime.now().toIso8601String(),
+      })
+          .eq('id', orderId)
+          .eq('user_id', userId);
     } catch (e) {
       throw Exception('Failed to update order status: $e');
     }
@@ -257,7 +289,13 @@ class OrderService {
   // Update payment status
   static Future<void> updatePaymentStatus(String orderId, String paymentStatus) async {
     try {
-      Map<String, dynamic> updateData = {'payment_status': paymentStatus};
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
+      Map<String, dynamic> updateData = {
+        'payment_status': paymentStatus,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
 
       // If payment is confirmed, update order status to processing
       if (paymentStatus == 'paid') {
@@ -267,7 +305,8 @@ class OrderService {
       await _client
           .from('orders')
           .update(updateData)
-          .eq('id', orderId);
+          .eq('id', orderId)
+          .eq('user_id', userId);
     } catch (e) {
       throw Exception('Failed to update payment status: $e');
     }
@@ -279,9 +318,10 @@ class OrderService {
       await _client
           .from('orders')
           .update({
-            'tracking_number': trackingNumber,
-            'status': 'shipped',
-          })
+        'tracking_number': trackingNumber,
+        'status': 'shipped',
+        'updated_at': DateTime.now().toIso8601String(),
+      })
           .eq('id', orderId);
     } catch (e) {
       throw Exception('Failed to add tracking number: $e');
@@ -296,7 +336,10 @@ class OrderService {
 
       await _client
           .from('orders')
-          .update({'status': 'delivered'})
+          .update({
+        'status': 'delivered',
+        'updated_at': DateTime.now().toIso8601String(),
+      })
           .eq('id', orderId)
           .eq('user_id', userId);
     } catch (e) {
@@ -377,10 +420,60 @@ class OrderService {
           .select('base_cost')
           .eq('id', shippingMethodId)
           .single();
-      
+
       return (response['base_cost'] as num).toDouble();
     } catch (e) {
       return 15000.0; // Default shipping cost if error
+    }
+  }
+
+  // Get order statistics for user
+  static Future<Map<String, int>> getOrderStatistics() async {
+    try {
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
+      final response = await _client
+          .from('orders')
+          .select('status, payment_status')
+          .eq('user_id', userId);
+
+      Map<String, int> stats = {
+        'total': 0,
+        'pending': 0,
+        'processing': 0,
+        'shipped': 0,
+        'delivered': 0,
+        'cancelled': 0,
+      };
+
+      for (var order in response) {
+        stats['total'] = (stats['total'] ?? 0) + 1;
+
+        final status = order['status'] as String;
+        final paymentStatus = order['payment_status'] as String;
+
+        if (paymentStatus == 'pending') {
+          stats['pending'] = (stats['pending'] ?? 0) + 1;
+        } else if (status == 'processing' || status == 'waiting_shipment') {
+          stats['processing'] = (stats['processing'] ?? 0) + 1;
+        } else if (status == 'shipped') {
+          stats['shipped'] = (stats['shipped'] ?? 0) + 1;
+        } else if (status == 'delivered') {
+          stats['delivered'] = (stats['delivered'] ?? 0) + 1;
+        }
+      }
+
+      return stats;
+    } catch (e) {
+      return {
+        'total': 0,
+        'pending': 0,
+        'processing': 0,
+        'shipped': 0,
+        'delivered': 0,
+        'cancelled': 0,
+      };
     }
   }
 }

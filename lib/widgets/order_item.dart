@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
+import '../services/order_service.dart';
 
 class OrderItemWidget extends StatelessWidget {
   final String storeName;
@@ -10,6 +11,8 @@ class OrderItemWidget extends StatelessWidget {
   final int quantity;
   final bool isSmallScreen;
   final VoidCallback onAddNote;
+  final Function(Map<String, dynamic>)? onShippingMethodSelected;
+  final Function(double)? onShippingCostChanged;
 
   const OrderItemWidget({
     Key? key,
@@ -21,6 +24,8 @@ class OrderItemWidget extends StatelessWidget {
     required this.quantity,
     required this.isSmallScreen,
     required this.onAddNote,
+    this.onShippingMethodSelected,
+    this.onShippingCostChanged,
   }) : super(key: key);
 
   @override
@@ -28,22 +33,24 @@ class OrderItemWidget extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Store name with icon
-        Row(
-          children: [
-            Icon(Icons.store_rounded, size: 16, color: Colors.grey[600]),
-            const SizedBox(width: 8),
-            Text(
-              storeName,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'SF Pro Display',
+        // Store name with icon (only show if storeName is not empty)
+        if (storeName.isNotEmpty) ...[
+          Row(
+            children: [
+              Icon(Icons.store_rounded, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 8),
+              Text(
+                storeName,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'SF Pro Display',
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
 
         // Product details
         Row(
@@ -150,7 +157,7 @@ class OrderItemWidget extends StatelessWidget {
 
         const SizedBox(height: 12),
 
-        // Shipping option card - Now clickable
+        // Shipping option card - Now using dynamic data
         GestureDetector(
           onTap: () => _showShippingOptions(context),
           child: _buildShippingOption(),
@@ -158,7 +165,7 @@ class OrderItemWidget extends StatelessWidget {
 
         const SizedBox(height: 12),
 
-        // Add note button - Now using the context for the pop-up
+        // Add note button
         GestureDetector(
           onTap: () => _showAddNoteDialog(context),
           child: _buildAddNoteButton(),
@@ -174,14 +181,26 @@ class OrderItemWidget extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => ShippingOptionsBottomSheet(),
+      builder: (context) => ShippingOptionsBottomSheet(
+        onShippingMethodSelected: (method) {
+          if (onShippingMethodSelected != null) {
+            onShippingMethodSelected!(method);
+          }
+          if (onShippingCostChanged != null) {
+            final cost = (method['base_cost'] as num?)?.toDouble() ?? 0;
+            onShippingCostChanged!(cost);
+          }
+        },
+      ),
     );
   }
 
   void _showAddNoteDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AddNoteDialog(),
+      builder: (context) => AddNoteDialog(
+        productName: productName,
+      ),
     );
   }
 
@@ -218,25 +237,13 @@ class OrderItemWidget extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              RichText(
-                text: const TextSpan(
-                  style: TextStyle(
-                    fontFamily: 'SF Pro Display',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
-                  ),
-                  children: [
-                    TextSpan(text: 'Standard (Rp.0 '),
-                    TextSpan(
-                      text: 'Rp 11.000',
-                      style: TextStyle(
-                        decoration: TextDecoration.lineThrough,
-                        color: Color(0xFF909090),
-                      ),
-                    ),
-                    TextSpan(text: ')'),
-                  ],
+              const Text(
+                'Pilih Pengiriman',
+                style: TextStyle(
+                  fontFamily: 'SF Pro Display',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
                 ),
               ),
             ],
@@ -280,104 +287,95 @@ class OrderItemWidget extends StatelessWidget {
   }
 }
 
-// Shipping Options Bottom Sheet
+// Dynamic Shipping Options Bottom Sheet
 class ShippingOptionsBottomSheet extends StatefulWidget {
+  final Function(Map<String, dynamic>)? onShippingMethodSelected;
+
+  const ShippingOptionsBottomSheet({
+    Key? key,
+    this.onShippingMethodSelected,
+  }) : super(key: key);
+
   @override
   _ShippingOptionsBottomSheetState createState() => _ShippingOptionsBottomSheetState();
 }
 
 class _ShippingOptionsBottomSheetState extends State<ShippingOptionsBottomSheet> {
-  int selectedCourierIndex = 0;
+  List<Map<String, dynamic>> _shippingMethods = [];
+  Map<String, dynamic>? _selectedMethod;
+  bool _isLoading = true;
 
-  // Sample courier data
-  final List<CourierOption> couriers = [
-    CourierOption(
-      name: 'JNE',
-      imageAsset: 'assets/images/kurir/jne.png',
-      services: [
-        ShippingService(
-          name: 'REG (Reguler)',
-          price: 11000,
-          estimatedDays: '2-3',
-          hasPromo: true,
-        ),
-        ShippingService(
-          name: 'YES (Yakin Esok Sampai)',
-          price: 18000,
-          estimatedDays: '1',
-          hasPromo: false,
-        ),
-      ],
-    ),
-    CourierOption(
-      name: 'SiCepat',
-      imageAsset: 'assets/images/kurir/sicepat.png',
-      services: [
-        ShippingService(
-          name: 'REG (Reguler)',
-          price: 10000,
-          estimatedDays: '2-3',
-          hasPromo: true,
-        ),
-        ShippingService(
-          name: 'BEST (Besok Sampai)',
-          price: 17000,
-          estimatedDays: '1',
-          hasPromo: false,
-        ),
-      ],
-    ),
-    CourierOption(
-      name: 'J&T',
-      imageAsset: 'assets/images/kurir/jnt.png',
-      services: [
-        ShippingService(
-          name: 'Ekonomi',
-          price: 9000,
-          estimatedDays: '3-4',
-          hasPromo: true,
-        ),
-        ShippingService(
-          name: 'Express',
-          price: 15000,
-          estimatedDays: '1-2',
-          hasPromo: false,
-        ),
-      ],
-    ),
-    CourierOption(
-      name: 'AnterAja',
-      imageAsset: 'assets/images/kurir/anteraja.jpg',
-      services: [
-        ShippingService(
-          name: 'Reguler',
-          price: 10500,
-          estimatedDays: '2-3',
-          hasPromo: true,
-        ),
-        ShippingService(
-          name: 'Next Day',
-          price: 16500,
-          estimatedDays: '1',
-          hasPromo: false,
-        ),
-      ],
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadShippingMethods();
+  }
 
-  int? selectedServiceIndex;
+  Future<void> _loadShippingMethods() async {
+    try {
+      final methods = await OrderService.getShippingMethods();
+      setState(() {
+        _shippingMethods = methods;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading shipping methods: $e')),
+      );
+    }
+  }
+
+  // Group shipping methods by courier (extract courier name from method name)
+  Map<String, List<Map<String, dynamic>>> get _groupedMethods {
+    Map<String, List<Map<String, dynamic>>> grouped = {};
+
+    for (var method in _shippingMethods) {
+      String methodName = method['name'] ?? '';
+      String courierName = '';
+
+      // Extract courier name from method name
+      if (methodName.toLowerCase().contains('jne')) {
+        courierName = 'JNE';
+      } else if (methodName.toLowerCase().contains('sicepat')) {
+        courierName = 'SiCepat';
+      } else if (methodName.toLowerCase().contains('j&t')) {
+        courierName = 'J&T';
+      } else if (methodName.toLowerCase().contains('anteraja')) {
+        courierName = 'AnterAja';
+      } else {
+        courierName = 'Lainnya';
+      }
+
+      if (!grouped.containsKey(courierName)) {
+        grouped[courierName] = [];
+      }
+      grouped[courierName]!.add(method);
+    }
+
+    return grouped;
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Container(
+        height: 300,
+        child: const Center(
+          child: CircularProgressIndicator(color: AppColors.primaryColor),
+        ),
+      );
+    }
+
     return DraggableScrollableSheet(
-      initialChildSize: 0.85,
+      initialChildSize: 0.7,
       minChildSize: 0.5,
-      maxChildSize: 0.95,
+      maxChildSize: 0.9,
       expand: false,
       builder: (context, scrollController) {
         return Column(
           children: [
-            // Header with title and close button
+            // Header
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -412,209 +410,181 @@ class _ShippingOptionsBottomSheetState extends State<ShippingOptionsBottomSheet>
               ),
             ),
 
-            // Main content
+            // Content
             Expanded(
               child: ListView(
                 controller: scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.all(16),
                 children: [
-                  // Courier tabs
-                  SizedBox(
-                    height: 80,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: couriers.length,
-                      itemBuilder: (context, index) {
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              selectedCourierIndex = index;
-                              selectedServiceIndex = null;
-                            });
-                          },
-                          child: Container(
-                            width: 80,
-                            margin: const EdgeInsets.only(right: 12),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: selectedCourierIndex == index
-                                    ? AppColors.primaryColor
-                                    : Colors.grey[300]!,
-                                width: selectedCourierIndex == index ? 2 : 1,
+                  ..._groupedMethods.entries.map((courierEntry) {
+                    final courierName = courierEntry.key;
+                    final methods = courierEntry.value;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Courier header
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: _getCourierIcon(courierName),
                               ),
-                              borderRadius: BorderRadius.circular(12),
-                              color: selectedCourierIndex == index
-                                  ? AppColors.primaryColor.withOpacity(0.05)
-                                  : Colors.white,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // Using icons instead of images for this example
-                                Image.asset(
-                                  couriers[index].imageAsset,
-                                  width: 30,
-                                  height: 30,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Icon(
-                                      Icons.local_shipping,
-                                      color: selectedCourierIndex == index
-                                          ? AppColors.primaryColor
-                                          : Colors.grey[600],
-                                    );
-                                  },
+                              const SizedBox(width: 12),
+                              Text(
+                                courierName,
+                                style: const TextStyle(
+                                  fontFamily: 'SF Pro Display',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  couriers[index].name,
-                                  style: TextStyle(
-                                    fontFamily: 'SF Pro Display',
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: selectedCourierIndex == index
-                                        ? AppColors.primaryColor
-                                        : Colors.black,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Shipping services for selected courier
-                  ...couriers[selectedCourierIndex].services.asMap().entries.map((entry) {
-                    final int idx = entry.key;
-                    final service = entry.value;
-
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedServiceIndex = idx;
-                        });
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: selectedServiceIndex == idx
-                                ? AppColors.primaryColor
-                                : Colors.grey[200]!,
-                            width: selectedServiceIndex == idx ? 2 : 1,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          color: selectedServiceIndex == idx
-                              ? AppColors.primaryColor.withOpacity(0.05)
-                              : Colors.white,
                         ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Radio button
-                            Radio<int>(
-                              value: idx,
-                              groupValue: selectedServiceIndex,
-                              activeColor: AppColors.primaryColor,
-                              onChanged: (value) {
-                                setState(() {
-                                  selectedServiceIndex = value;
-                                });
-                              },
-                            ),
 
-                            // Service details
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        // Methods for this courier
+                        ...methods.map((method) {
+                          final isSelected = _selectedMethod == method;
+                          final serviceName = _extractServiceName(method['name']);
+                          final baseCost = (method['base_cost'] as num?)?.toDouble() ?? 0;
+                          final hasPromo = baseCost <= 15000; // Free shipping if cost is low
+
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedMethod = method;
+                              });
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppColors.primaryColor
+                                      : Colors.grey[200]!,
+                                  width: isSelected ? 2 : 1,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                color: isSelected
+                                    ? AppColors.primaryColor.withOpacity(0.05)
+                                    : Colors.white,
+                              ),
+                              child: Row(
                                 children: [
-                                  // Service name and estimated days
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        service.name,
-                                        style: const TextStyle(
-                                          fontFamily: 'SF Pro Display',
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Estimasi ${service.estimatedDays} hari',
-                                        style: TextStyle(
-                                          fontFamily: 'SF Pro Display',
-                                          fontSize: 12,
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                    ],
+                                  // Radio button
+                                  Radio<Map<String, dynamic>>(
+                                    value: method,
+                                    groupValue: _selectedMethod,
+                                    activeColor: AppColors.primaryColor,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _selectedMethod = value;
+                                      });
+                                    },
                                   ),
 
-                                  const SizedBox(height: 4),
-
-                                  // Price with promo if available
-                                  if (service.hasPromo)
-                                    Row(
+                                  // Service details
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF1E7C48).withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: const Text(
-                                            'GRATIS ONGKIR',
-                                            style: TextStyle(
-                                              color: Color(0xFF1E7C48),
+                                        // Service name and estimated days
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              serviceName,
+                                              style: const TextStyle(
+                                                fontFamily: 'SF Pro Display',
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            Text(
+                                              _getEstimatedDays(method['type']),
+                                              style: TextStyle(
+                                                fontFamily: 'SF Pro Display',
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+
+                                        const SizedBox(height: 4),
+
+                                        // Price with promo if available
+                                        if (hasPromo)
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF1E7C48).withOpacity(0.1),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Text(
+                                                  'GRATIS ONGKIR',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF1E7C48),
+                                                    fontFamily: 'SF Pro Display',
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text(
+                                                'Rp 0',
+                                                style: TextStyle(
+                                                  fontFamily: 'SF Pro Display',
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: AppColors.success,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Rp ${baseCost.toStringAsFixed(0)}',
+                                                style: const TextStyle(
+                                                  fontFamily: 'SF Pro Display',
+                                                  fontSize: 12,
+                                                  decoration: TextDecoration.lineThrough,
+                                                  color: Color(0xFF909090),
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        else
+                                          Text(
+                                            'Rp ${baseCost.toStringAsFixed(0)}',
+                                            style: const TextStyle(
                                               fontFamily: 'SF Pro Display',
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w800,
-                                              fontStyle: FontStyle.italic,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
                                             ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Rp 0',
-                                          style: const TextStyle(
-                                            fontFamily: 'SF Pro Display',
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.success,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Rp ${service.price}',
-                                          style: const TextStyle(
-                                            fontFamily: 'SF Pro Display',
-                                            fontSize: 12,
-                                            decoration: TextDecoration.lineThrough,
-                                            color: Color(0xFF909090),
-                                          ),
-                                        ),
                                       ],
-                                    )
-                                  else
-                                    Text(
-                                      'Rp ${service.price}',
-                                      style: const TextStyle(
-                                        fontFamily: 'SF Pro Display',
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                      ),
                                     ),
+                                  ),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
+                          );
+                        }).toList(),
+
+                        const SizedBox(height: 16),
+                      ],
                     );
                   }).toList(),
                 ],
@@ -638,9 +608,11 @@ class _ShippingOptionsBottomSheetState extends State<ShippingOptionsBottomSheet>
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: selectedServiceIndex != null
+                  onPressed: _selectedMethod != null
                       ? () {
-                    // Here you would typically save the selected shipping option
+                    if (widget.onShippingMethodSelected != null) {
+                      widget.onShippingMethodSelected!(_selectedMethod!);
+                    }
                     Navigator.of(context).pop();
                   }
                       : null,
@@ -669,10 +641,83 @@ class _ShippingOptionsBottomSheetState extends State<ShippingOptionsBottomSheet>
       },
     );
   }
+
+  Widget _getCourierIcon(String courierName) {
+    IconData icon;
+    switch (courierName.toLowerCase()) {
+      case 'jne':
+        icon = Icons.local_shipping;
+        break;
+      case 'sicepat':
+        icon = Icons.speed;
+        break;
+      case 'j&t':
+        icon = Icons.delivery_dining;
+        break;
+      case 'anteraja':
+        icon = Icons.motorcycle;
+        break;
+      default:
+        icon = Icons.local_shipping;
+    }
+
+    return Icon(
+      icon,
+      color: AppColors.primaryColor,
+      size: 20,
+    );
+  }
+
+  String _extractServiceName(String fullName) {
+    // Extract service name from full method name
+    // e.g., "JNE Regular" -> "REG (Reguler)"
+    // e.g., "JNE YES" -> "YES (Yakin Esok Sampai)"
+
+    if (fullName.toLowerCase().contains('regular') || fullName.toLowerCase().contains('reg')) {
+      return 'REG (Reguler)';
+    } else if (fullName.toLowerCase().contains('yes')) {
+      return 'YES (Yakin Esok Sampai)';
+    } else if (fullName.toLowerCase().contains('best')) {
+      return 'BEST (Besok Sampai)';
+    } else if (fullName.toLowerCase().contains('ekonomi')) {
+      return 'Ekonomi';
+    } else if (fullName.toLowerCase().contains('express')) {
+      return 'Express';
+    } else if (fullName.toLowerCase().contains('next day')) {
+      return 'Next Day';
+    } else {
+      // Fallback: use the part after the courier name
+      List<String> parts = fullName.split(' ');
+      if (parts.length > 1) {
+        return parts.sublist(1).join(' ');
+      }
+      return fullName;
+    }
+  }
+
+  String _getEstimatedDays(String? type) {
+    switch (type?.toLowerCase()) {
+      case 'express':
+        return 'Estimasi 1 hari';
+      case 'standard':
+        return 'Estimasi 2-3 hari';
+      case 'economy':
+        return 'Estimasi 3-4 hari';
+      default:
+        return 'Estimasi 2-3 hari';
+    }
+  }
 }
 
-// Add Note Dialog
+// Add Note Dialog (unchanged)
 class AddNoteDialog extends StatefulWidget {
+  final String productName;
+
+  const AddNoteDialog({
+    Key? key,
+    required this.productName,
+  }) : super(key: key);
+
   @override
   _AddNoteDialogState createState() => _AddNoteDialogState();
 }
@@ -702,12 +747,30 @@ class _AddNoteDialogState extends State<AddNoteDialog> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Tambahkan Catatan',
-                  style: TextStyle(
-                    fontFamily: 'SF Pro Display',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Tambahkan Catatan',
+                        style: TextStyle(
+                          fontFamily: 'SF Pro Display',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.productName,
+                        style: TextStyle(
+                          fontFamily: 'SF Pro Display',
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
                 IconButton(
@@ -752,7 +815,6 @@ class _AddNoteDialogState extends State<AddNoteDialog> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  // Here you would typically save the note
                   Navigator.of(context).pop(_noteController.text);
                 },
                 style: ElevatedButton.styleFrom(
@@ -778,31 +840,4 @@ class _AddNoteDialogState extends State<AddNoteDialog> {
       ),
     );
   }
-}
-
-// Data Models
-class CourierOption {
-  final String name;
-  final String imageAsset;
-  final List<ShippingService> services;
-
-  CourierOption({
-    required this.name,
-    required this.imageAsset,
-    required this.services,
-  });
-}
-
-class ShippingService {
-  final String name;
-  final int price;
-  final String estimatedDays;
-  final bool hasPromo;
-
-  ShippingService({
-    required this.name,
-    required this.price,
-    required this.estimatedDays,
-    required this.hasPromo,
-  });
 }

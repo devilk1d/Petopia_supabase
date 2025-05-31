@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../utils/colors.dart';
 import '../services/transaction_service.dart';
 import '../services/auth_service.dart';
-import 'package:intl/intl.dart';
 
 class TransactionScreen extends StatefulWidget {
   const TransactionScreen({Key? key}) : super(key: key);
@@ -13,7 +12,7 @@ class TransactionScreen extends StatefulWidget {
 
 class _TransactionScreenState extends State<TransactionScreen> {
   int _selectedTabIndex = 0;
-  final List<String> _tabTitles = ['Semua', 'Berlangsung', 'Berhasil', 'Gagal'];
+  final List<String> _tabTitles = ['Semua', 'Pending', 'Berlangsung', 'Selesai'];
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
   List<Map<String, dynamic>> _transactions = [];
@@ -75,16 +74,16 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
     try {
       List<Map<String, dynamic>> transactions;
-      
+
       switch (_selectedTabIndex) {
-        case 1: // Berlangsung
+        case 1: // Pending
+          transactions = await TransactionService.getTransactionsByStatus('PENDING');
+          break;
+        case 2: // Berlangsung
           transactions = await TransactionService.getTransactionsByStatus('ONGOING');
           break;
-        case 2: // Berhasil
+        case 3: // Selesai
           transactions = await TransactionService.getTransactionsByStatus('COMPLETED');
-          break;
-        case 3: // Gagal
-          transactions = await TransactionService.getTransactionsByStatus('FAILED');
           break;
         case 0: // Semua
         default:
@@ -111,6 +110,38 @@ class _TransactionScreenState extends State<TransactionScreen> {
         );
       }
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoggedIn = AuthService.getCurrentUserId() != null;
+
+    if (!isLoggedIn) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: _buildLoginPrompt(),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            _buildSearchAndTabs(),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _transactions.isEmpty
+                  ? _buildEmptyState()
+                  : _buildTransactionList(),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildLoginPrompt() {
@@ -155,47 +186,11 @@ class _TransactionScreenState extends State<TransactionScreen> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
+                color: Colors.white,
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isLoggedIn = AuthService.getCurrentUserId() != null;
-    
-    if (!isLoggedIn) {
-      return Scaffold(
-        backgroundColor: Colors.white,
-        body: _buildLoginPrompt(),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header Section
-            _buildHeader(),
-
-            // Search and Tab Bar
-            _buildSearchAndTabs(),
-
-            // Transaction List or Loading/Empty State
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _transactions.isEmpty
-                      ? _buildEmptyState()
-                      : _buildTransactionList(),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -294,57 +289,92 @@ class _TransactionScreenState extends State<TransactionScreen> {
   }
 
   Widget _buildTransactionList() {
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-      itemCount: _transactions.length,
-      itemBuilder: (context, index) {
-        final transaction = _transactions[index];
-        return _buildTransactionCard(transaction);
-      },
+    return RefreshIndicator(
+      onRefresh: _loadTransactions,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+        itemCount: _transactions.length,
+        itemBuilder: (context, index) {
+          return _buildTransactionCard(_transactions[index]);
+        },
+      ),
     );
   }
 
   Widget _buildTransactionCard(Map<String, dynamic> transaction) {
-    final date = transaction['date'] as DateTime;
-    final formattedDate = DateFormat('dd MMMM yyyy', 'id_ID').format(date);
-    final status = transaction['status'] as String;
-    Color statusColor;
-    
-    switch (status.toUpperCase()) {
-      case 'COMPLETED':
-        statusColor = Colors.green;
-        break;
-      case 'FAILED':
-        statusColor = Colors.red;
-        break;
-      case 'ONGOING':
-        statusColor = AppColors.primaryColor;
-        break;
-      default:
-        statusColor = Colors.grey;
+    // Safely get values with null checks and default values
+    final String orderId = transaction['id']?.toString() ?? '';
+    final String invoiceNumber = transaction['invoiceNumber']?.toString() ?? 'N/A';
+    final String storeName = transaction['storeName']?.toString() ?? 'Unknown Store';
+    final String storeImage = transaction['storeImage']?.toString() ?? '';
+    final String productName = transaction['productName']?.toString() ?? 'Unknown Product';
+    final String productImage = transaction['productImage']?.toString() ?? '';
+    final String quantity = transaction['quantity']?.toString() ?? '0 barang';
+    final String paymentMethod = transaction['paymentMethod']?.toString() ?? 'Unknown';
+    final String status = transaction['status']?.toString() ?? 'UNKNOWN';
+
+    // Safe date handling
+    DateTime date = DateTime.now();
+    final dateValue = transaction['date'];
+    if (dateValue is DateTime) {
+      date = dateValue;
     }
 
+    // Safe double conversion
+    double totalAmount = 0.0;
+    final totalValue = transaction['totalAmount'];
+    if (totalValue is double) {
+      totalAmount = totalValue;
+    } else if (totalValue is int) {
+      totalAmount = totalValue.toDouble();
+    } else if (totalValue is String) {
+      totalAmount = double.tryParse(totalValue) ?? 0.0;
+    }
+
+    String formattedDate = _formatDate(date);
+
+    Color statusColor;
     String statusText;
+
     switch (status.toUpperCase()) {
       case 'COMPLETED':
+        statusColor = AppColors.success;
         statusText = 'Selesai';
         break;
       case 'FAILED':
+        statusColor = AppColors.error;
         statusText = 'Gagal';
         break;
+      case 'PENDING':
+        statusColor = AppColors.warning;
+        statusText = 'Menunggu Pembayaran';
+        break;
       case 'ONGOING':
+        statusColor = AppColors.primaryColor;
         statusText = 'Dalam Proses';
         break;
       default:
+        statusColor = Colors.grey;
         statusText = status;
     }
 
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(
-        context,
-        '/order-detail',
-        arguments: {'orderId': transaction['id']},
-      ),
+      onTap: () {
+        if (orderId.isNotEmpty) {
+          Navigator.pushNamed(
+            context,
+            '/order-detail',
+            arguments: orderId,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Order ID tidak ditemukan'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -369,28 +399,38 @@ class _TransactionScreenState extends State<TransactionScreen> {
                   Row(
                     children: [
                       // Store icon
-                      CircleAvatar(
-                        radius: 12,
-                        backgroundImage: NetworkImage(transaction['storeIcon']),
-                        onBackgroundImageError: (_, __) {
-                          // Fallback icon will be shown through child property
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryLight.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryColor.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: ClipOval(
+                          child: storeImage.isNotEmpty && storeImage.startsWith('http')
+                              ? Image.network(
+                            storeImage,
+                            width: 24,
+                            height: 24,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.store,
+                                size: 14,
+                                color: AppColors.primaryColor,
+                              );
+                            },
+                          )
+                              : const Icon(
                             Icons.store,
-                            size: 16,
+                            size: 14,
                             color: AppColors.primaryColor,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        transaction['storeName'],
+                        storeName,
                         style: const TextStyle(
                           fontFamily: 'SF Pro Display',
                           fontSize: 14,
@@ -400,7 +440,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                     ],
                   ),
                   Text(
-                    transaction['invoiceNumber'],
+                    invoiceNumber,
                     style: TextStyle(
                       fontFamily: 'SF Pro Display',
                       fontSize: 12,
@@ -422,8 +462,9 @@ class _TransactionScreenState extends State<TransactionScreen> {
                   // Product image
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      transaction['productImage'],
+                    child: productImage.isNotEmpty && productImage.startsWith('http')
+                        ? Image.network(
+                      productImage,
                       width: 60,
                       height: 60,
                       fit: BoxFit.cover,
@@ -438,17 +479,26 @@ class _TransactionScreenState extends State<TransactionScreen> {
                           ),
                         );
                       },
+                    )
+                        : Container(
+                      width: 60,
+                      height: 60,
+                      color: Colors.grey.shade200,
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        color: Colors.grey.shade400,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  
+
                   // Product details
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          transaction['productName'],
+                          productName,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -459,7 +509,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          transaction['quantity'],
+                          quantity,
                           style: TextStyle(
                             fontFamily: 'SF Pro Display',
                             fontSize: 12,
@@ -480,15 +530,29 @@ class _TransactionScreenState extends State<TransactionScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // Date
-                  Text(
-                    formattedDate,
-                    style: TextStyle(
-                      fontFamily: 'SF Pro Display',
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        formattedDate,
+                        style: TextStyle(
+                          fontFamily: 'SF Pro Display',
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        paymentMethod,
+                        style: TextStyle(
+                          fontFamily: 'SF Pro Display',
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
                   ),
-                  
+
                   // Status and total
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -514,7 +578,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _formatPrice(transaction['totalAmount']),
+                        _formatPrice(totalAmount),
                         style: const TextStyle(
                           fontFamily: 'SF Pro Display',
                           fontSize: 14,
@@ -576,6 +640,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                 fontFamily: 'SF Pro Display',
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
+                color: Colors.white,
               ),
             ),
           ),
@@ -584,10 +649,24 @@ class _TransactionScreenState extends State<TransactionScreen> {
     );
   }
 
+  String _formatDate(DateTime date) {
+    // Indonesian month names
+    const List<String> monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+
+    final day = date.day.toString().padLeft(2, '0');
+    final month = monthNames[date.month - 1];
+    final year = date.year.toString();
+
+    return '$day $month $year';
+  }
+
   String _formatPrice(double price) {
     return 'Rp ${price.toStringAsFixed(0).replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]}.',
-        )}';
+    )}';
   }
 }

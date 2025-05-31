@@ -13,7 +13,7 @@ class ProductService {
   // Expose Supabase client for real-time subscriptions
   static SupabaseClient get supabase => _client;
 
-  // Get all active products with pagination
+  // Get all active products with pagination - NO AUTH REQUIRED
   static Future<List<ProductModel>> getProducts({
     int page = 0,
     int limit = 20,
@@ -21,14 +21,16 @@ class ProductService {
     String? searchQuery,
   }) async {
     try {
+      print('Fetching products - Page: $page, Limit: $limit, Category: $categoryId, Search: $searchQuery');
+
       var query = _client
           .from('products')
           .select('''
             *,
-            product_categories!inner (
+            product_categories!left (
               name
             ),
-            sellers!inner (
+            sellers!left (
               store_name,
               store_image_url
             )
@@ -37,7 +39,7 @@ class ProductService {
       // Add filters after select
       query = query.eq('is_active', true);
 
-      if (categoryId != null) {
+      if (categoryId != null && categoryId.isNotEmpty) {
         query = query.eq('category_id', categoryId);
       }
 
@@ -50,10 +52,15 @@ class ProductService {
           .order('created_at', ascending: false)
           .range(page * limit, (page + 1) * limit - 1);
 
-      if (response == null) return [];
+      print('Product query response: ${response?.length ?? 0} items');
+
+      if (response == null || (response as List).isEmpty) {
+        print('No products found');
+        return [];
+      }
 
       return (response as List).map((json) {
-        // Add joined data to the main object
+        // Add joined data to the main object - handle both inner and left joins
         json['category_name'] = json['product_categories']?['name'];
         json['seller_store_name'] = json['sellers']?['store_name'];
         json['seller_store_image'] = json['sellers']?['store_image_url'];
@@ -61,75 +68,95 @@ class ProductService {
         return ProductModel.fromJson(json);
       }).toList();
     } catch (e) {
-      print('ProductService error: $e');
+      print('ProductService.getProducts error: $e');
+      // Return empty list instead of throwing error to prevent UI crashes
       return [];
     }
   }
 
-  // Get product by ID
+  // Get product by ID - NO AUTH REQUIRED
   static Future<ProductModel?> getProductById(String productId) async {
     try {
+      print('Fetching product by ID: $productId');
+
       final response = await _client
           .from('products')
           .select('''
             *,
-            product_categories!inner (
+            product_categories!left (
               name
             ),
-            sellers!inner (
+            sellers!left (
               store_name,
               store_image_url
             )
           ''')
           .eq('id', productId)
           .eq('is_active', true)
-          .single();
+          .maybeSingle();
 
-      if (response == null) return null;
+      if (response == null) {
+        print('Product not found: $productId');
+        return null;
+      }
 
       // Add joined data to the main object
       response['category_name'] = response['product_categories']?['name'];
       response['seller_store_name'] = response['sellers']?['store_name'];
       response['seller_store_image'] = response['sellers']?['store_image_url'];
 
+      print('Product found: ${response['name']}');
       return ProductModel.fromJson(response);
     } catch (e) {
+      print('ProductService.getProductById error: $e');
       return null;
     }
   }
 
-  // Get products by category
+  // Get products by category - NO AUTH REQUIRED
   static Future<List<ProductModel>> getProductsByCategory(String categoryId) async {
     return getProducts(categoryId: categoryId);
   }
 
-  // Get categories
+  // Get categories - NO AUTH REQUIRED
   static Future<List<CategoryModel>> getCategories() async {
     try {
+      print('Fetching product categories');
+
       final response = await _client
           .from('product_categories')
           .select()
           .order('name');
 
+      print('Categories response: ${response?.length ?? 0} items');
+
+      if (response == null || (response as List).isEmpty) {
+        print('No categories found');
+        return [];
+      }
+
       return (response as List)
           .map((json) => CategoryModel.fromJson(json))
           .toList();
     } catch (e) {
-      throw Exception('Failed to fetch categories: $e');
+      print('ProductService.getCategories error: $e');
+      return [];
     }
   }
 
-  // Get recommended products (top rated or recent)
+  // Get recommended products (top rated or recent) - NO AUTH REQUIRED
   static Future<List<ProductModel>> getRecommendedProducts({int limit = 10}) async {
     try {
+      print('Fetching recommended products, limit: $limit');
+
       final response = await _client
           .from('products')
           .select('''
             *,
-            product_categories!inner (
+            product_categories!left (
               name
             ),
-            sellers!inner (
+            sellers!left (
               store_name,
               store_image_url
             )
@@ -138,7 +165,12 @@ class ProductService {
           .order('rating', ascending: false)
           .limit(limit);
 
-      if (response == null) return [];
+      print('Recommended products response: ${response?.length ?? 0} items');
+
+      if (response == null || (response as List).isEmpty) {
+        print('No recommended products found');
+        return [];
+      }
 
       return (response as List).map((json) {
         json['category_name'] = json['product_categories']?['name'];
@@ -148,19 +180,22 @@ class ProductService {
         return ProductModel.fromJson(json);
       }).toList();
     } catch (e) {
-      print('ProductService error: $e');
+      print('ProductService.getRecommendedProducts error: $e');
       return [];
     }
   }
 
-  // Search products
+  // Search products - NO AUTH REQUIRED
   static Future<List<ProductModel>> searchProducts(String query) async {
     return getProducts(searchQuery: query);
   }
 
-  // Add product (for sellers)
+  // Add product (for sellers) - AUTH REQUIRED
   static Future<ProductModel> addProduct(ProductModel product) async {
     try {
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
       final response = await _client
           .from('products')
           .insert(product.toJson())
@@ -173,9 +208,12 @@ class ProductService {
     }
   }
 
-  // Update product (for sellers)
+  // Update product (for sellers) - AUTH REQUIRED
   static Future<ProductModel> updateProduct(ProductModel product) async {
     try {
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
       final response = await _client
           .from('products')
           .update(product.toJson())
@@ -189,9 +227,12 @@ class ProductService {
     }
   }
 
-  // Delete product (for sellers)
+  // Delete product (for sellers) - AUTH REQUIRED
   static Future<void> deleteProduct(String productId) async {
     try {
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
       await _client
           .from('products')
           .update({'is_active': false})
@@ -201,23 +242,32 @@ class ProductService {
     }
   }
 
-  // Get products by seller
+  // Get products by seller - NO AUTH REQUIRED (for viewing seller store)
   static Future<List<ProductModel>> getProductsBySeller(String sellerId) async {
     try {
+      print('Fetching products for seller: $sellerId');
+
       final response = await _client
           .from('products')
           .select('''
             *,
-            product_categories!inner (
+            product_categories!left (
               name
             ),
-            sellers!inner (
+            sellers!left (
               store_name,
               store_image_url
             )
           ''')
           .eq('seller_id', sellerId)
+          .eq('is_active', true)
           .order('created_at', ascending: false);
+
+      print('Seller products response: ${response?.length ?? 0} items');
+
+      if (response == null || (response as List).isEmpty) {
+        return [];
+      }
 
       return (response as List).map((json) {
         json['category_name'] = json['product_categories']?['name'];
@@ -227,11 +277,12 @@ class ProductService {
         return ProductModel.fromJson(json);
       }).toList();
     } catch (e) {
-      throw Exception('Failed to fetch seller products: $e');
+      print('ProductService.getProductsBySeller error: $e');
+      return [];
     }
   }
 
-  // Upload image to Supabase storage (Same as store_service)
+  // Upload image to Supabase storage - AUTH REQUIRED
   static Future<String?> uploadImage(File imageFile) async {
     try {
       final userId = AuthService.getCurrentUserId();
@@ -322,7 +373,7 @@ class ProductService {
     }
   }
 
-  // Upload multiple product images
+  // Upload multiple product images - AUTH REQUIRED
   static Future<List<String>> uploadProductImages(List<File> imageFiles) async {
     try {
       print('\n=== Multiple Product Images Upload Started ===');
@@ -374,9 +425,12 @@ class ProductService {
     }
   }
 
-  // Update product with new images
+  // Update product with new images - AUTH REQUIRED
   static Future<bool> updateProductImages(String productId, List<File> imageFiles) async {
     try {
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
       print('Updating product images for product $productId');
 
       final imageUrls = await uploadProductImages(imageFiles);
@@ -402,9 +456,12 @@ class ProductService {
     }
   }
 
-  // Add single image to existing product images
+  // Add single image to existing product images - AUTH REQUIRED
   static Future<bool> addProductImage(String productId, File imageFile) async {
     try {
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
       print('Adding image to product $productId');
 
       // Get current product data
@@ -446,9 +503,12 @@ class ProductService {
     }
   }
 
-  // Remove specific image from product
+  // Remove specific image from product - AUTH REQUIRED
   static Future<bool> removeProductImage(String productId, String imageUrl) async {
     try {
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
       print('Removing image from product $productId');
 
       // Get current product data
@@ -483,16 +543,16 @@ class ProductService {
     }
   }
 
-  // Get product images
+  // Get product images - NO AUTH REQUIRED
   static Future<List<String>> getProductImages(String productId) async {
     try {
       final response = await _client
           .from('products')
           .select('images')
           .eq('id', productId)
-          .single();
+          .maybeSingle();
 
-      if (response['images'] != null) {
+      if (response != null && response['images'] != null) {
         return List<String>.from(response['images']);
       }
       return [];
