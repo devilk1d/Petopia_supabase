@@ -395,6 +395,8 @@ class TransactionService {
       return 'FAILED';
     } else if (orderStatus == 'delivered') {
       return 'COMPLETED';
+    } else if (orderStatus == 'shipped') {
+      return 'ON_DELIVERY';
     } else if (orderStatus == 'pending_payment') {
       return 'PENDING';
     } else {

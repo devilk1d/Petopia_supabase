@@ -67,7 +67,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> with Single
     Navigator.of(context).pushNamedAndRemoveUntil(
       '/home',
           (route) => false,
-      arguments: 4, // Navigate to transaction tab
+      arguments: 0, // Navigate to transaction tab
     );
   }
 
@@ -75,7 +75,10 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> with Single
     if (_orderId != null) {
       Navigator.of(context).pushReplacementNamed(
         '/order-detail',
-        arguments: {'orderId': _orderId},
+        arguments: {
+          'orderId': _orderId,
+          // tambahkan data lain jika diperlukan
+        },
       );
     } else {
       _navigateToHome();
@@ -214,7 +217,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> with Single
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.home, size: 20),
+                                  Icon(Icons.home, size: 20, color: Colors.white),
                                   SizedBox(width: 8),
                                   Text(
                                     'Kembali ke Beranda',

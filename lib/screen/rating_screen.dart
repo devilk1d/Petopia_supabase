@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import '../services/review_service.dart';
+import '../services/auth_service.dart';
 
 class RatingScreen extends StatefulWidget {
-  const RatingScreen({Key? key}) : super(key: key);
+  final String productId;
+  final String orderId;
+
+  const RatingScreen({
+    Key? key,
+    required this.productId,
+    required this.orderId,
+  }) : super(key: key);
 
   @override
   State<RatingScreen> createState() => _RatingScreenState();
@@ -10,6 +19,7 @@ class RatingScreen extends StatefulWidget {
 class _RatingScreenState extends State<RatingScreen> {
   int _rating = 4; // Default rating
   final TextEditingController _reviewController = TextEditingController();
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -175,10 +185,7 @@ class _RatingScreenState extends State<RatingScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // Handle submit logic
-                    _submitRating();
-                  },
+                  onPressed: _isSubmitting ? null : _submitRating,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFB60051),
                     foregroundColor: Colors.white,
@@ -187,14 +194,23 @@ class _RatingScreenState extends State<RatingScreen> {
                     ),
                     elevation: 2,
                   ),
-                  child: const Text(
-                    'Submit',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'Submit',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 40),
@@ -222,34 +238,69 @@ class _RatingScreenState extends State<RatingScreen> {
     }
   }
 
-  void _submitRating() {
-    // Show success feedback
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.white),
-            SizedBox(width: 8),
-            Text(
-              'Terima kasih atas rating dan review Anda!',
-              style: TextStyle(fontFamily: 'Poppins'),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+  Future<void> _submitRating() async {
+    if (!AuthService.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to submit a rating'),
+          backgroundColor: Colors.red,
         ),
-        backgroundColor: const Color(0xFFBF0055),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        margin: const EdgeInsets.all(10),
-      ),
-    );
+      );
+      return;
+    }
 
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.of(context).pop();
-    });
+    setState(() => _isSubmitting = true);
+
+    try {
+      await ReviewService.addReview(
+        productId: widget.productId,
+        orderId: widget.orderId,
+        rating: _rating.toDouble(),
+        comment: _reviewController.text.trim(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text(
+                  'Terima kasih atas rating dan review Anda!',
+                  style: TextStyle(fontFamily: 'Poppins'),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFFBF0055),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(10),
+          ),
+        );
+
+        Future.delayed(const Duration(seconds: 2), () {
+          Navigator.of(context).pop(true); // Return true to indicate successful rating
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error submitting rating: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 }
 

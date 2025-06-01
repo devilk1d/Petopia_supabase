@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ReviewService {
   static final _client = SupabaseConfig.client;
+  static SupabaseClient get supabase => _client;
 
   // Get product reviews
   static Future<List<ReviewModel>> getProductReviews(
@@ -16,12 +17,12 @@ class ReviewService {
   }) async {
     try {
       final response = await _client
-          .from('reviews')
+          .from('product_reviews')
           .select('''
             *,
             users (
               full_name,
-              avatar_url
+              profile_image_url
             )
           ''')
           .eq('product_id', productId)
@@ -44,12 +45,12 @@ class ReviewService {
       if (userId == null) throw Exception('User not authenticated');
 
       final response = await _client
-          .from('reviews')
+          .from('product_reviews')
           .select('''
             *,
             users (
               full_name,
-              avatar_url
+              profile_image_url
             )
           ''')
           .eq('user_id', userId)
@@ -76,11 +77,11 @@ class ReviewService {
 
       // Check if user has already reviewed this product for this order
       final existingReview = await _client
-          .from('reviews')
+          .from('product_reviews')
           .select()
           .eq('user_id', userId)
           .eq('product_id', productId)
-          .eq('order_id', orderId)
+          .eq('order_item_id', orderId)
           .maybeSingle();
 
       if (existingReview != null) {
@@ -88,20 +89,20 @@ class ReviewService {
       }
 
       final response = await _client
-          .from('reviews')
+          .from('product_reviews')
           .insert({
             'user_id': userId,
             'product_id': productId,
-            'order_id': orderId,
-            'rating': rating,
-            'comment': comment,
-            'images': images,
+            'order_item_id': orderId,
+            'rating': rating.toInt(),
+            'review_text': comment,
+            'images': images ?? [],
           })
           .select('''
             *,
             users (
               full_name,
-              avatar_url
+              profile_image_url
             )
           ''')
           .single();
@@ -124,14 +125,14 @@ class ReviewService {
       if (userId == null) throw Exception('User not authenticated');
 
       final updateData = {
-        if (rating != null) 'rating': rating,
-        if (comment != null) 'comment': comment,
+        if (rating != null) 'rating': rating.toInt(),
+        if (comment != null) 'review_text': comment,
         if (images != null) 'images': images,
         'updated_at': DateTime.now().toIso8601String(),
       };
 
       final response = await _client
-          .from('reviews')
+          .from('product_reviews')
           .update(updateData)
           .eq('id', reviewId)
           .eq('user_id', userId)
@@ -139,7 +140,7 @@ class ReviewService {
             *,
             users (
               full_name,
-              avatar_url
+              profile_image_url
             )
           ''')
           .single();
@@ -157,7 +158,7 @@ class ReviewService {
       if (userId == null) throw Exception('User not authenticated');
 
       await _client
-          .from('reviews')
+          .from('product_reviews')
           .delete()
           .eq('id', reviewId)
           .eq('user_id', userId);
@@ -170,7 +171,7 @@ class ReviewService {
   static Future<Map<String, dynamic>> getProductRatingSummary(String productId) async {
     try {
       final response = await _client
-          .from('reviews')
+          .from('product_reviews')
           .select('rating')
           .eq('product_id', productId);
 

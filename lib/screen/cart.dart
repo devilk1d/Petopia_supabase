@@ -881,11 +881,19 @@ class _CartScreenState extends State<CartScreen> {
                     child: ElevatedButton(
                       onPressed: _selectedItemCount > 0
                           ? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => CheckoutScreen()),
-                        );
-                      }
+                                // Filter selected items
+                                final selectedItems = _cartItems.where(
+                                  (item) => _productSelections[item['id']] == true
+                                ).toList();
+                                
+                                Navigator.pushNamed(
+                                  context,
+                                  '/checkout',
+                                  arguments: {
+                                    'selectedItems': selectedItems,
+                                  },
+                                );
+                              }
                           : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryColor,

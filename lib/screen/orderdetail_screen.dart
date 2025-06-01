@@ -32,7 +32,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       return;
     }
 
-    String orderId = args.toString();
+    // Handle both cases: when args is a Map or direct String
+    String orderId;
+    if (args is Map<String, dynamic>) {
+      orderId = args['orderId']?.toString() ?? '';
+    } else {
+      orderId = args.toString();
+    }
 
     if (orderId.isEmpty || orderId == 'null') {
       _setError('Order ID tidak valid');
@@ -124,10 +130,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         'orderId': _orderData!['id'],
         'orderNumber': _orderData!['order_number'],
         'totalAmount': _orderData!['total_amount'],
-        'paymentMethod': {
-          'name': 'BCA Virtual Account',
-          'logo_url': 'assets/images/bca.png'
-        },
+        'paymentMethod': _orderData!['payment_methods'],
       },
     );
   }
@@ -913,6 +916,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final quantity = _safeGetInt(item['quantity'], defaultValue: 1);
     final price = _safeGetDouble(item['price']);
     final variant = _safeGetString(item['variant']);
+    final storeName = _safeGetString(productData['seller_store_name'], defaultValue: 'Unknown Store');
+    final storeImage = _safeGetString(productData['seller_store_image']);
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -933,6 +938,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Store profile (image + name)
+                Row(
+                  children: [
+                    _buildSafeImage(
+                      imageUrl: storeImage.isNotEmpty ? storeImage : null,
+                      width: 24,
+                      height: 24,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      storeName,
+                      style: const TextStyle(
+                        fontFamily: 'SF Pro Display',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Text(
                   productName,
                   style: const TextStyle(
@@ -944,7 +971,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-
                 if (variant.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Container(
@@ -963,9 +989,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                   ),
                 ],
-
                 const SizedBox(height: 12),
-
                 // Price and quantity
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1106,6 +1130,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final shippingCost = _safeGetDouble(_orderData?['shipping_cost']);
     final discountAmount = _safeGetDouble(_orderData?['discount_amount']);
     final subtotal = totalAmount - shippingCost + discountAmount;
+    final paymentMethod = _safeGetString(_orderData?['payment_methods']?['name'] ?? _orderData?['payment_method']);
 
     return Container(
       width: double.infinity,
@@ -1144,7 +1169,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
-
+          if (paymentMethod.isNotEmpty) ...[
+            _buildSummaryRow('Metode Pembayaran', _formatPaymentMethod(paymentMethod)),
+            const SizedBox(height: 8),
+          ],
           _buildSummaryRow('Subtotal', 'Rp${_formatPrice(subtotal)}'),
           const SizedBox(height: 8),
           _buildSummaryRow('Ongkos Kirim', 'Rp${_formatPrice(shippingCost)}'),
@@ -1152,12 +1180,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             const SizedBox(height: 8),
             _buildSummaryRow('Diskon', '-Rp${_formatPrice(discountAmount)}', isDiscount: true),
           ],
-
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Divider(color: Colors.grey[200], height: 1),
           ),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1200,6 +1226,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
         Text(
           value,
+          softWrap: true,
+          maxLines: 2,
           style: TextStyle(
             fontFamily: 'SF Pro Display',
             fontSize: 14,
@@ -1249,7 +1277,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.payment, size: 20),
+                      Icon(Icons.payment, size: 20, color: Colors.white,),
                       SizedBox(width: 8),
                       Text(
                         'Lanjutkan Pembayaran',
@@ -1273,7 +1301,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: ElevatedButton(
                   onPressed: () => _showOrderReceivedDialog(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
+                    backgroundColor: AppColors.primaryColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -1283,7 +1311,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle, size: 20),
+                      Icon(Icons.check_circle,color: Colors.white, size: 20),
                       SizedBox(width: 8),
                       Text(
                         'Pesanan Diterima',
@@ -1300,8 +1328,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ],
 
             // Secondary actions
-            if (paymentStatus == 'paid' && ['processing', 'waiting_shipment', 'shipped', 'delivered'].contains(status)) ...[
-              if (paymentStatus != 'pending' && status != 'shipped') const SizedBox(height: 12),
+            if (paymentStatus == 'paid' && status == 'delivered') ...[
               Row(
                 children: [
                   // Complaint button
@@ -1333,39 +1360,49 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                     ),
                   ),
-
-                  // Rating button for delivered orders
-                  if (status == 'delivered') ...[
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pushNamed(context, '/rating'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black87,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final result = await Navigator.pushNamed(
+                          context,
+                          '/rating',
+                          arguments: {
+                            'productId': _orderData!['order_items'][0]['product_id'],
+                            'orderId': _orderData!['order_items'][0]['id'],
+                          },
+                        );
+                        
+                        if (result == true) {
+                          // Refresh order details after successful rating
+                          _loadOrderData();
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black87,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.star_outline, size: 18),
-                            SizedBox(width: 6),
-                            Text(
-                              'Beri Rating',
-                              style: TextStyle(
-                                fontFamily: 'SF Pro Display',
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.star_outline, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'Beri Rating',
+                            style: TextStyle(
+                              fontFamily: 'SF Pro Display',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ],
               ),
             ],
@@ -1600,5 +1637,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]}.',
     );
+  }
+
+  String _formatPaymentMethod(String method) {
+    final lower = method.toLowerCase();
+    if (lower.contains('alfamart') && lower.contains('lawson')) {
+      // Untuk string seperti "Alfamart / Alfamidi / Lawson / Dan+Dan"
+      return method.replaceAll(' / Lawson', '\nLawson');
+    }
+    return method;
   }
 }

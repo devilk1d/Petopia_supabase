@@ -16,6 +16,7 @@ class StoreService {
     required String storeDescription,
     required String phone,
     required String address,
+    String? imageUrl,
   }) async {
     try {
       final userId = AuthService.getCurrentUserId();
@@ -40,6 +41,7 @@ class StoreService {
         'store_description': storeDescription,
         'phone': phone,
         'address': address,
+        if (imageUrl != null) 'store_image_url': imageUrl,
         'is_verified': false,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),

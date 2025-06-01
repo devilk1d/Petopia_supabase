@@ -11,7 +11,12 @@ import '../widgets/payment_method.dart';
 import 'dart:async';
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({Key? key}) : super(key: key);
+  final List<Map<String, dynamic>> selectedItems;
+  
+  const CheckoutScreen({
+    Key? key,
+    required this.selectedItems,
+  }) : super(key: key);
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -19,6 +24,14 @@ class CheckoutScreen extends StatefulWidget {
 
 Map<String, Map<String, dynamic>?> _storeShippingMethods = {}; // Track shipping per store
 Map<String, double> _storeShippingCosts = {}; // Track shipping costs per store
+
+// Helper function to format price with thousand separators
+String _formatPrice(double price) {
+  return 'Rp ${price.toStringAsFixed(0).replaceAllMapped(
+    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]}.',
+  )}';
+}
 
 class StoreShippingOptionsBottomSheet extends StatefulWidget {
   final String storeId;
@@ -190,7 +203,7 @@ class _StoreShippingOptionsBottomSheetState extends State<StoreShippingOptionsBo
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  color: AppColors.primaryColor.withOpacity(0.1),
+                                  color: AppColors.greyColor.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: _getCourierIcon(courierName),
@@ -300,7 +313,7 @@ class _StoreShippingOptionsBottomSheetState extends State<StoreShippingOptionsBo
 
                                         // Price
                                         Text(
-                                          'Rp ${baseCost.toStringAsFixed(0)}',
+                                          _formatPrice(baseCost),
                                           style: const TextStyle(
                                             fontFamily: 'SF Pro Display',
                                             fontSize: 13,
@@ -377,28 +390,28 @@ class _StoreShippingOptionsBottomSheetState extends State<StoreShippingOptionsBo
   }
 
   Widget _getCourierIcon(String courierName) {
-    IconData icon;
+    String imagePath;
     switch (courierName.toLowerCase()) {
       case 'jne':
-        icon = Icons.local_shipping;
+        imagePath = 'assets/images/kurir/jne.png';
         break;
       case 'sicepat':
-        icon = Icons.speed;
+        imagePath = 'assets/images/kurir/sicepat.png';
         break;
       case 'j&t':
-        icon = Icons.delivery_dining;
+        imagePath = 'assets/images/kurir/jnt.png';
         break;
       case 'anteraja':
-        icon = Icons.motorcycle;
+        imagePath = 'assets/images/kurir/anteraja.jpg';
         break;
       default:
-        icon = Icons.local_shipping;
+        imagePath = 'assets/images/kurir/default.png';
     }
 
-    return Icon(
-      icon,
-      color: AppColors.primaryColor,
-      size: 18,
+    return Image.asset(
+      imagePath,
+      width: 20,
+      height: 20,
     );
   }
 
@@ -465,8 +478,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _initializeCheckout() async {
     setState(() => _isLoading = true);
     try {
-      // Load cart items
-      final items = await CartService.getCartItems();
+      // Use the selected items passed from cart screen
+      _cartItems = widget.selectedItems;
 
       // Load payment methods
       final paymentMethods = await CheckoutService.getPaymentMethods();
@@ -476,7 +489,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       if (mounted) {
         setState(() {
-          _cartItems = items;
           _paymentMethods = paymentMethods;
           _selectedAddress = defaultAddress;
 
@@ -635,6 +647,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         shippingAddress: _selectedAddress!.toJson(),
         paymentMethodId: _selectedPaymentMethod!['id'],
         shippingMethodId: _storeShippingMethods.values.first!['id'],
+        selectedItems: _cartItems,
         promoCode: _promoCode,
         notes: allNotes.isNotEmpty ? allNotes : null,
       );
@@ -814,7 +827,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      'Rp${_total.toStringAsFixed(0)}',
+                      _formatPrice(_total),
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -1042,10 +1055,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             color: AppColors.primaryColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Icon(
-                              Icons.store_rounded,
-                              size: 14,
-                              color: AppColors.primaryColor
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.network(
+                              storeItems.first['storeIcon'] ?? '',
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  Icons.store_rounded,
+                                  size: 14,
+                                  color: AppColors.primaryColor
+                                );
+                              },
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -1200,7 +1222,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Rp${(item['price'] as double).toStringAsFixed(0)}',
+                          _formatPrice(item['price'] as double),
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -1397,6 +1419,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   contentPadding: const EdgeInsets.all(12),
                 ),
                 style: const TextStyle(fontFamily: 'SF Pro Display'),
+                textCapitalization: TextCapitalization.characters,
               ),
 
               const SizedBox(height: 16),
@@ -1538,7 +1561,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ),
                     Text(
-                      'Rp ${(_storeShippingCosts[storeId] ?? 0).toStringAsFixed(0)}',
+                      _formatPrice(_storeShippingCosts[storeId] ?? 0),
                       style: TextStyle(
                         fontFamily: 'SF Pro Display',
                         fontSize: 11,
@@ -1823,7 +1846,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             // Summary rows
             _buildSummaryRow(
               'Total Harga (${_cartItems.length} Barang)',
-              'Rp${_subtotal.toStringAsFixed(0)}',
+              _formatPrice(_subtotal),
             ),
 
             // Shipping cost breakdown by store
@@ -1840,7 +1863,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                 return _buildSummaryRow(
                   'Ongkir - $storeName',
-                  'Rp${entry.value.toStringAsFixed(0)}',
+                  _formatPrice(entry.value),
                   isIndented: true,
                 );
               }).toList()),
@@ -1859,7 +1882,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _buildSummaryRow(
               'Total Ongkos Kirim',
               _shippingCost > 0
-                  ? 'Rp${_shippingCost.toStringAsFixed(0)}'
+                  ? _formatPrice(_shippingCost)
                   : 'Gratis',
               valueColor: _shippingCost == 0 ? AppColors.success : null,
             ),
@@ -1867,7 +1890,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             if (_discountAmount > 0)
               _buildSummaryRow(
                 'Diskon',
-                '-Rp${_discountAmount.toStringAsFixed(0)}',
+                '-${_formatPrice(_discountAmount)}',
                 valueColor: AppColors.success,
               ),
 
@@ -1885,7 +1908,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 Text(
-                  'Rp${_total.toStringAsFixed(0)}',
+                  _formatPrice(_total),
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,

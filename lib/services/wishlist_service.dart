@@ -2,9 +2,11 @@
 import '../models/product_model.dart';
 import 'supabase_config.dart';
 import 'auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class WishlistService {
   static final _client = SupabaseConfig.client;
+  static SupabaseClient get supabase => _client;
 
   // Get user's wishlist items
   static Future<List<ProductModel>> getWishlistItems() async {

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/store_service.dart';
+import '../utils/colors.dart';
+import '../utils/format.dart';
 
 class PromoForm extends StatefulWidget {
   final Map<String, dynamic>? promo;
@@ -34,6 +37,16 @@ class _PromoFormState extends State<PromoForm> {
   @override
   void initState() {
     super.initState();
+    // Set status bar to transparent
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
+
     _codeController = TextEditingController(text: widget.promo?['code'] ?? '');
     _titleController = TextEditingController(text: widget.promo?['title'] ?? '');
     _descriptionController = TextEditingController(text: widget.promo?['description'] ?? '');
@@ -58,6 +71,26 @@ class _PromoFormState extends State<PromoForm> {
         : null;
   }
 
+  void _showSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: const TextStyle(
+              fontFamily: 'SF Pro Display',
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: const Color(0xFF2D3748),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
+  }
+
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -69,15 +102,15 @@ class _PromoFormState extends State<PromoForm> {
         'title': _titleController.text,
         'description': _descriptionController.text,
         'discount_type': _discountType,
-        'discount_value': double.parse(_discountValueController.text),
+        'discount_value': double.parse(_discountValueController.text.replaceAll(RegExp(r'[^0-9]'), '')),
         'min_purchase': _minPurchaseController.text.isNotEmpty
-            ? double.parse(_minPurchaseController.text)
+            ? double.parse(_minPurchaseController.text.replaceAll(RegExp(r'[^0-9]'), ''))
             : null,
         'max_discount': _maxDiscountController.text.isNotEmpty
-            ? double.parse(_maxDiscountController.text)
+            ? double.parse(_maxDiscountController.text.replaceAll(RegExp(r'[^0-9]'), ''))
             : null,
         'usage_limit': _usageLimitController.text.isNotEmpty
-            ? int.parse(_usageLimitController.text)
+            ? int.parse(_usageLimitController.text.replaceAll(RegExp(r'[^0-9]'), ''))
             : null,
         'start_date': _startDate?.toIso8601String(),
         'end_date': _endDate?.toIso8601String(),
@@ -90,15 +123,15 @@ class _PromoFormState extends State<PromoForm> {
           title: _titleController.text,
           description: _descriptionController.text,
           discountType: _discountType,
-          discountValue: double.parse(_discountValueController.text),
+          discountValue: double.parse(_discountValueController.text.replaceAll(RegExp(r'[^0-9]'), '')),
           minPurchase: _minPurchaseController.text.isNotEmpty
-              ? double.parse(_minPurchaseController.text)
+              ? double.parse(_minPurchaseController.text.replaceAll(RegExp(r'[^0-9]'), ''))
               : null,
           maxDiscount: _maxDiscountController.text.isNotEmpty
-              ? double.parse(_maxDiscountController.text)
+              ? double.parse(_maxDiscountController.text.replaceAll(RegExp(r'[^0-9]'), ''))
               : null,
           usageLimit: _usageLimitController.text.isNotEmpty
-              ? int.parse(_usageLimitController.text)
+              ? int.parse(_usageLimitController.text.replaceAll(RegExp(r'[^0-9]'), ''))
               : null,
           startDate: _startDate,
           endDate: _endDate,
@@ -111,11 +144,11 @@ class _PromoFormState extends State<PromoForm> {
       }
 
       widget.onSuccess();
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving promo: $e')),
-      );
+      _showSnackBar('Error saving promo: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -127,6 +160,19 @@ class _PromoFormState extends State<PromoForm> {
       initialDate: isStartDate ? _startDate ?? DateTime.now() : _endDate ?? DateTime.now().add(const Duration(days: 30)),
       firstDate: DateTime.now(),
       lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppColors.primaryColor,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: const Color(0xFF1E293B),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -144,243 +190,650 @@ class _PromoFormState extends State<PromoForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      extendBody: true,
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.arrow_back,
+              color: Color(0xFF1E293B),
+              size: 20,
+            ),
+          ),
+          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+        ),
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+        ),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Header Section with full screen background
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 80,
+                left: 24,
+                right: 24,
+                bottom: 32,
+              ),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFFF8FAFC),
+                    Colors.white,
+                  ],
+                ),
+              ),
+              child: Row(
                 children: [
-                  Text(
-                    widget.promo == null ? 'Add Promo' : 'Edit Promo',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: _isSubmitting ? null : () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              TextFormField(
-                controller: _codeController,
-                decoration: InputDecoration(
-                  labelText: 'Promo Code',
-                  prefixIcon: const Icon(Icons.local_offer),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter promo code';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _titleController,
-                decoration: InputDecoration(
-                  labelText: 'Title',
-                  prefixIcon: const Icon(Icons.title),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter title';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: InputDecoration(
-                  labelText: 'Description',
-                  prefixIcon: const Icon(Icons.description),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                maxLines: 2,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter description';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _discountType,
-                decoration: InputDecoration(
-                  labelText: 'Discount Type',
-                  prefixIcon: const Icon(Icons.discount),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'percentage',
-                    child: Text('Percentage'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'fixed',
-                    child: Text('Fixed Amount'),
-                  ),
-                ],
-                onChanged: _isSubmitting
-                    ? null
-                    : (value) {
-                  setState(() {
-                    _discountType = value!;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _discountValueController,
-                decoration: InputDecoration(
-                  labelText: 'Discount Value',
-                  prefixIcon: const Icon(Icons.money),
-                  suffixText: _discountType == 'percentage' ? '%' : 'Rp',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter discount value';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
-                  if (_discountType == 'percentage' && double.parse(value) > 100) {
-                    return 'Percentage cannot be more than 100';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _minPurchaseController,
-                decoration: InputDecoration(
-                  labelText: 'Minimum Purchase (optional)',
-                  prefixIcon: const Icon(Icons.shopping_cart),
-                  prefixText: 'Rp ',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value != null && value.isNotEmpty) {
-                    if (double.tryParse(value) == null) {
-                      return 'Please enter a valid number';
-                    }
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _maxDiscountController,
-                decoration: InputDecoration(
-                  labelText: 'Maximum Discount (optional)',
-                  prefixIcon: const Icon(Icons.money_off),
-                  prefixText: 'Rp ',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value != null && value.isNotEmpty) {
-                    if (double.tryParse(value) == null) {
-                      return 'Please enter a valid number';
-                    }
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _usageLimitController,
-                decoration: InputDecoration(
-                  labelText: 'Usage Limit (optional)',
-                  prefixIcon: const Icon(Icons.people),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value != null && value.isNotEmpty) {
-                    if (int.tryParse(value) == null) {
-                      return 'Please enter a valid number';
-                    }
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.calendar_today),
-                title: Text(
-                  _startDate == null
-                      ? 'Select Start Date'
-                      : 'Start Date: ${_startDate!.toLocal().toString().split(' ')[0]}',
-                ),
-                trailing: const Icon(Icons.arrow_drop_down),
-                onTap: _isSubmitting ? null : () => _selectDate(context, true),
-              ),
-              ListTile(
-                leading: const Icon(Icons.calendar_today),
-                title: Text(
-                  _endDate == null
-                      ? 'Select End Date (optional)'
-                      : 'End Date: ${_endDate!.toLocal().toString().split(' ')[0]}',
-                ),
-                trailing: const Icon(Icons.arrow_drop_down),
-                onTap: _isSubmitting ? null : () => _selectDate(context, false),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submitForm,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    child: Icon(
+                      Icons.local_offer_outlined,
+                      color: AppColors.primaryColor,
+                      size: 24,
+                    ),
                   ),
-                  child: _isSubmitting
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                    'Save Promo',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.promo == null ? 'Add Promo' : 'Edit Promo',
+                          style: const TextStyle(
+                            fontFamily: 'SF Pro Display',
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.promo == null ? 'Create a new promotional offer' : 'Update promo details',
+                          style: TextStyle(
+                            fontFamily: 'SF Pro Display',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ],
+              ),
+            ),
+
+            // Form Content
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    // Basic Information
+                    _buildBasicInfoCard(),
+                    const SizedBox(height: 16),
+
+                    // Discount Details
+                    _buildDiscountCard(),
+                    const SizedBox(height: 16),
+
+                    // Conditions
+                    _buildConditionsCard(),
+                    const SizedBox(height: 16),
+
+                    // Validity Period
+                    _buildValidityCard(),
+                    const SizedBox(height: 24),
+
+                    // Save Button
+                    _buildSaveButton(),
+                    const SizedBox(height: 20),
+                  ],
                 ),
               ),
-            ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBasicInfoCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.info_outlined, size: 20, color: AppColors.primaryColor),
+                const SizedBox(width: 12),
+                const Text(
+                  'Basic Information',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildTextField(
+              controller: _codeController,
+              label: 'Promo Code',
+              icon: Icons.local_offer_outlined,
+              validator: (value) => value?.isEmpty ?? true ? 'Please enter promo code' : null,
+            ),
+            const SizedBox(height: 16),
+            _buildTextField(
+              controller: _titleController,
+              label: 'Title',
+              icon: Icons.title_outlined,
+              validator: (value) => value?.isEmpty ?? true ? 'Please enter title' : null,
+            ),
+            const SizedBox(height: 16),
+            _buildTextField(
+              controller: _descriptionController,
+              label: 'Description',
+              icon: Icons.description_outlined,
+              maxLines: 3,
+              validator: (value) => value?.isEmpty ?? true ? 'Please enter description' : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDiscountCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.discount_outlined, size: 20, color: AppColors.primaryColor),
+                const SizedBox(width: 12),
+                const Text(
+                  'Discount Details',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildDiscountTypeDropdown(),
+            const SizedBox(height: 16),
+            _buildTextField(
+              controller: _discountValueController,
+              label: 'Discount Value',
+              icon: Icons.money_outlined,
+              suffixText: _discountType == 'percentage' ? '%' : 'Rp',
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.isEmpty) return 'Please enter discount value';
+                String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+                if (digits.isEmpty) return 'Please enter a valid number';
+                if (_discountType == 'percentage' && double.parse(digits) > 100) {
+                  return 'Percentage cannot be more than 100';
+                }
+                return null;
+              },
+              isPrice: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConditionsCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.tune_outlined, size: 20, color: AppColors.primaryColor),
+                const SizedBox(width: 12),
+                const Text(
+                  'Conditions (Optional)',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildTextField(
+              controller: _minPurchaseController,
+              label: 'Minimum Purchase (optional)',
+              icon: Icons.shopping_cart_outlined,
+              prefixText: 'Rp ',
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value != null && value.isNotEmpty) {
+                  String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+                  if (digits.isEmpty) return 'Please enter a valid number';
+                }
+                return null;
+              },
+              isPrice: true,
+            ),
+            const SizedBox(height: 16),
+            _buildTextField(
+              controller: _maxDiscountController,
+              label: 'Maximum Discount (optional)',
+              icon: Icons.money_off_outlined,
+              prefixText: 'Rp ',
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value != null && value.isNotEmpty) {
+                  String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+                  if (digits.isEmpty) return 'Please enter a valid number';
+                }
+                return null;
+              },
+              isPrice: true,
+            ),
+            const SizedBox(height: 16),
+            _buildTextField(
+              controller: _usageLimitController,
+              label: 'Usage Limit (optional)',
+              icon: Icons.people_outlined,
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value != null && value.isNotEmpty && int.tryParse(value) == null) {
+                  return 'Please enter a valid number';
+                }
+                return null;
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildValidityCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.calendar_month_outlined, size: 20, color: AppColors.primaryColor),
+                const SizedBox(width: 12),
+                const Text(
+                  'Validity Period',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildDatePicker(
+              label: 'Start Date',
+              icon: Icons.calendar_today_outlined,
+              selectedDate: _startDate,
+              isStartDate: true,
+            ),
+            const SizedBox(height: 16),
+            _buildDatePicker(
+              label: 'End Date (optional)',
+              icon: Icons.event_outlined,
+              selectedDate: _endDate,
+              isStartDate: false,
+              isOptional: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? Function(String?)? validator,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+    String? prefixText,
+    String? suffixText,
+    bool isPrice = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'SF Pro Display',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF374151),
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          style: const TextStyle(fontFamily: 'SF Pro Display'),
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, color: const Color(0xFF6B7280), size: 20),
+            prefixText: prefixText,
+            prefixStyle: const TextStyle(fontFamily: 'SF Pro Display'),
+            suffixText: suffixText,
+            suffixStyle: const TextStyle(fontFamily: 'SF Pro Display'),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.primaryColor, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFFAFBFC),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          keyboardType: keyboardType,
+          maxLines: maxLines,
+          validator: validator,
+          onChanged: isPrice
+              ? (value) {
+                  String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+                  if (digits.isEmpty) {
+                    controller.text = '';
+                  } else {
+                    controller.text = formatRupiah(int.parse(digits));
+                  }
+                  controller.selection = TextSelection.fromPosition(
+                    TextPosition(offset: controller.text.length),
+                  );
+                }
+              : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDiscountTypeDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Discount Type',
+          style: TextStyle(
+            fontFamily: 'SF Pro Display',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF374151),
+          ),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: _discountType,
+          style: const TextStyle(
+            fontFamily: 'SF Pro Display',
+            color: Color(0xFF1E293B),
+          ),
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.discount_outlined,
+                color: Color(0xFF6B7280), size: 20),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.primaryColor, width: 2),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFFAFBFC),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          items: [
+            DropdownMenuItem(
+              value: 'percentage',
+              child: Text(
+                'Percentage',
+                style: const TextStyle(fontFamily: 'SF Pro Display'),
+              ),
+            ),
+            DropdownMenuItem(
+              value: 'fixed',
+              child: Text(
+                'Fixed Amount',
+                style: const TextStyle(fontFamily: 'SF Pro Display'),
+              ),
+            ),
+          ],
+          onChanged: _isSubmitting
+              ? null
+              : (value) {
+            setState(() {
+              _discountType = value!;
+            });
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDatePicker({
+    required String label,
+    required IconData icon,
+    required DateTime? selectedDate,
+    required bool isStartDate,
+    bool isOptional = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'SF Pro Display',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF374151),
+          ),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: _isSubmitting ? null : () => _selectDate(context, isStartDate),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAFBFC),
+              border: Border.all(color: const Color(0xFFD1D5DB)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: const Color(0xFF6B7280), size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    selectedDate == null
+                        ? (isOptional ? 'Select Date (optional)' : 'Select Date')
+                        : '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                    style: TextStyle(
+                      fontFamily: 'SF Pro Display',
+                      fontSize: 16,
+                      color: selectedDate == null
+                          ? const Color(0xFF9CA3AF)
+                          : const Color(0xFF1E293B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.arrow_drop_down, color: Color(0xFF6B7280)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _isSubmitting ? null : _submitForm,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          elevation: 0,
+        ),
+        child: _isSubmitting
+            ? const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            color: Colors.white,
+            strokeWidth: 2,
+          ),
+        )
+            : const Text(
+          'Save Promo',
+          style: TextStyle(
+            fontFamily: 'SF Pro Display',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _discountValueController.dispose();
+    _minPurchaseController.dispose();
+    _maxDiscountController.dispose();
+    _usageLimitController.dispose();
+    super.dispose();
   }
 }

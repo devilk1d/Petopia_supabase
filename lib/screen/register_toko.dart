@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/store_service.dart';
+import '../services/storage_service.dart';
+import 'dart:io';
 
 class RegisterTokoScreen extends StatefulWidget {
   const RegisterTokoScreen({Key? key}) : super(key: key);
@@ -32,6 +34,8 @@ class _RegisterTokoScreenState extends State<RegisterTokoScreen> {
 
   bool _isLoading = false;
   String? _errorMessage;
+  File? _selectedImage;
+  String? _uploadedImageUrl;
 
   @override
   void initState() {
@@ -84,6 +88,15 @@ class _RegisterTokoScreenState extends State<RegisterTokoScreen> {
     );
   }
 
+  Future<void> _pickImage() async {
+    final image = await StorageService.pickImage();
+    if (image != null) {
+      setState(() {
+        _selectedImage = image;
+      });
+    }
+  }
+
   Future<void> _handleRegistration() async {
     setState(() {
       _isLoading = true;
@@ -98,12 +111,19 @@ class _RegisterTokoScreenState extends State<RegisterTokoScreen> {
         }
       }
 
+      String? imageUrl;
+      if (_selectedImage != null) {
+        imageUrl = await StorageService.uploadImage(_selectedImage!, 'profile');
+        if (imageUrl == null) throw Exception('Gagal upload gambar profil');
+      }
+
       // Register store
       await StoreService.registerStore(
         storeName: _formFields['Nama Toko']!.text.trim(),
         storeDescription: _formFields['Deskripsi']!.text.trim(),
         phone: _formFields['No. HP']!.text.trim(),
         address: _formFields['Alamat Toko']!.text.trim(),
+        imageUrl: imageUrl,
       );
 
       if (mounted) {
@@ -249,17 +269,29 @@ class _RegisterTokoScreenState extends State<RegisterTokoScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       const SizedBox(width: 20),
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFBF0055).withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.store,
-                          size: 30,
-                          color: Color(0xFFBF0055),
+                      GestureDetector(
+                        onTap: _pickImage,
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFBF0055).withOpacity(0.1),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFFBF0055), width: 2),
+                            image: _selectedImage != null
+                                ? DecorationImage(
+                                    image: FileImage(_selectedImage!),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          child: _selectedImage == null
+                              ? const Icon(
+                                  Icons.camera_alt,
+                                  size: 30,
+                                  color: Color(0xFFBF0055),
+                                )
+                              : null,
                         ),
                       ),
                       const SizedBox(width: 15),

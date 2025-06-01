@@ -70,13 +70,24 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomePageWrapper(),
         '/product-detail': (context) => const ProductDetailPage(),
         '/cart': (context) => const CartScreen(),
-        '/checkout': (context) => const CheckoutScreen(),
+        '/checkout': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return CheckoutScreen(
+            selectedItems: args['selectedItems'] as List<Map<String, dynamic>>,
+          );
+        },
         '/payment': (context) => const PaymentScreen(),
         '/payment-success': (context) => const PaymentSuccessScreen(),
         '/wishlist': (context) => const WishlistScreen(),
         '/promos': (context) => const PromosOffersScreen(),
         '/order-detail': (context) => const OrderDetailScreen(),
-        '/rating': (context) => const RatingScreen(),
+        '/rating': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return RatingScreen(
+            productId: args['productId'],
+            orderId: args['orderId'],
+          );
+        },
         '/user-profile': (context) => const UserProfile(),
         '/store-profile': (context) => const StoreProfile(),
         '/address-list': (context) => const AddressListScreen(),

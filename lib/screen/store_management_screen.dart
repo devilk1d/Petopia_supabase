@@ -7,9 +7,14 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'product_form.dart';
 import 'promo_form.dart';
+import '../services/order_service.dart';
+import '../utils/format.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class StoreManagementScreen extends StatefulWidget {
-  const StoreManagementScreen({Key? key}) : super(key: key);
+  final String storeId;
+  static String? activeStoreId;
+  const StoreManagementScreen({Key? key, required this.storeId}) : super(key: key);
 
   @override
   State<StoreManagementScreen> createState() => _StoreManagementScreenState();
@@ -21,6 +26,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
   Map<String, dynamic>? _storeData;
   List<Map<String, dynamic>> _products = [];
   List<Map<String, dynamic>> _promos = [];
+  List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
 
   // Form controllers
@@ -33,13 +39,12 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(_handleTabChange);
     _loadStoreData();
   }
 
   void _handleTabChange() {
-    // Force rebuild when tab changes to update FAB
     if (mounted) setState(() {});
   }
 
@@ -66,14 +71,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
   Future<void> _loadStoreData() async {
     setState(() => _isLoading = true);
     try {
-      final userId = AuthService.getCurrentUserId();
-      if (userId == null) {
-        _showSnackBar('Please login first');
-        Navigator.pop(context);
-        return;
-      }
-
-      final store = await StoreService.getStoreByUserId(userId);
+      final store = await StoreService.getStoreById(widget.storeId);
       if (store == null) {
         _showSnackBar('Store not found');
         Navigator.pop(context);
@@ -82,12 +80,32 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
 
       final products = await StoreService.getStoreProducts(store['id']);
       final promos = await StoreService.getStorePromos(store['id']);
+      final orderModels = await OrderService.getOrdersBySeller(store['id']);
+
+      final orders = orderModels.map((order) => {
+        'id': order.id,
+        'order_number': order.orderNumber,
+        'status': order.status,
+        'created_at': order.createdAt.toIso8601String(),
+        'order_items': order.items.map((item) => {
+          'id': item.id,
+          'product_id': item.productId,
+          'quantity': item.quantity,
+          'price': item.price,
+          'variant': item.variant,
+          'products': {
+            'name': item.productName,
+            'images': [item.productImage],
+          },
+        }).toList(),
+      }).toList();
 
       if (mounted) {
         setState(() {
           _storeData = store;
           _products = products;
           _promos = promos;
+          _orders = orders;
           _isLoading = false;
         });
         _initializeFormControllers();
@@ -106,7 +124,9 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         SnackBar(
           content: Text(message),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: const Color(0xFF2D3748),
+          margin: const EdgeInsets.all(16),
         ),
       );
     }
@@ -116,102 +136,136 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
+        backgroundColor: Color(0xFFF8FAFC),
         body: Center(child: LoadingIndicator()),
       );
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: CustomScrollView(
+        slivers: [
+          // Modern App Bar
           SliverAppBar(
-            expandedHeight: 200,
+            expandedHeight: 180,
             floating: false,
             pinned: true,
             elevation: 0,
             backgroundColor: Colors.white,
-            foregroundColor: Colors.black87,
+            foregroundColor: const Color(0xFF1E293B),
+            surfaceTintColor: Colors.transparent,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                     colors: [
-                      AppColors.primaryLight,
-                      AppColors.primaryDark,
+                      Color(0xFFF8FAFC),
+                      Colors.white,
                     ],
                   ),
                 ),
                 child: SafeArea(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 20),
-                      _buildStoreAvatar(),
-                      const SizedBox(height: 12),
-                      Text(
-                        _storeData?['store_name'] ?? 'Store Management',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            _buildModernStoreAvatar(),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _storeData?['store_name'] ?? 'My Store',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF1E293B),
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Store Management',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Manage your store efficiently',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(48),
+              preferredSize: const Size.fromHeight(50),
               child: Container(
                 color: Colors.white,
                 child: TabBar(
                   controller: _tabController,
                   labelColor: AppColors.primaryColor,
-                  unselectedLabelColor: Colors.grey.shade600,
+                  unselectedLabelColor: const Color(0xFF64748B),
                   indicatorColor: AppColors.primaryColor,
-                  indicatorWeight: 3,
+                  indicatorWeight: 2,
+                  indicatorSize: TabBarIndicatorSize.label,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
                   tabs: const [
-                    Tab(text: 'Profile', icon: Icon(Icons.store, size: 20)),
-                    Tab(text: 'Products', icon: Icon(Icons.inventory, size: 20)),
-                    Tab(text: 'Promos', icon: Icon(Icons.local_offer, size: 20)),
+                    Tab(text: 'Profile'),
+                    Tab(text: 'Products'),
+                    Tab(text: 'Promos'),
+                    Tab(text: 'Orders'),
                   ],
                 ),
               ),
             ),
           ),
+          // Tab Content
+          SliverFillRemaining(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildModernStoreProfileTab(),
+                _buildModernProductsTab(),
+                _buildModernPromosTab(),
+                _buildModernOrdersTab(),
+              ],
+            ),
+          ),
         ],
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildStoreProfileTab(),
-            _buildProductsTab(),
-            _buildPromosTab(),
-          ],
-        ),
       ),
-      floatingActionButton: _buildFAB(),
+      floatingActionButton: _buildModernFAB(),
     );
   }
 
-  Widget _buildStoreAvatar() {
+  Widget _buildModernStoreAvatar() {
     return Container(
-      width: 80,
-      height: 80,
+      width: 64,
+      height: 64,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white.withOpacity(0.2),
-        border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+        color: const Color(0xFFF1F5F9),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 2),
         image: _storeData?['store_image_url'] != null
             ? DecorationImage(
           image: NetworkImage(_storeData!['store_image_url']),
@@ -220,16 +274,17 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
             : null,
       ),
       child: _storeData?['store_image_url'] == null
-          ? const Icon(Icons.store, size: 40, color: Colors.white)
+          ? Icon(Icons.store_rounded, size: 28, color: Colors.grey.shade500)
           : null,
     );
   }
 
-  Widget _buildFAB() {
-    // Hide FAB on Profile tab
-    if (_tabController.index == 0) return const SizedBox.shrink();
+  Widget _buildModernFAB() {
+    if (_tabController.index == 0 || _tabController.index == 3) {
+      return const SizedBox.shrink();
+    }
 
-    return FloatingActionButton.extended(
+    return FloatingActionButton(
       onPressed: () {
         if (_tabController.index == 1) {
           _showAddProductDialog();
@@ -238,95 +293,95 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         }
       },
       backgroundColor: AppColors.primaryColor,
-      icon: const Icon(Icons.add, color: Colors.white),
-      label: Text(
-        _tabController.index == 1 ? 'Add Product' : 'Add Promo',
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-      ),
+      elevation: 0,
+      shape: const CircleBorder(),
+      child: const Icon(Icons.add, color: Colors.white, size: 24),
     );
   }
 
-  Widget _buildStoreProfileTab() {
+  Widget _buildModernStoreProfileTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          _buildStatsCards(),
+          _buildModernStatsCards(),
           const SizedBox(height: 20),
-          _buildProfileForm(),
+          _buildModernProfileForm(),
         ],
       ),
     );
   }
 
-  Widget _buildStatsCards() {
+  Widget _buildModernStatsCards() {
     return Row(
       children: [
         Expanded(
-          child: _buildStatCard(
-            icon: Icons.inventory_2,
+          child: _buildModernStatCard(
+            icon: Icons.inventory_2_outlined,
             label: 'Products',
             value: _products.length.toString(),
-            color: Colors.orange,
+            color: const Color(0xFF3B82F6),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _buildStatCard(
-            icon: Icons.local_offer,
-            label: 'Active Promos',
+          child: _buildModernStatCard(
+            icon: Icons.local_offer_outlined,
+            label: 'Promos',
             value: _promos.length.toString(),
-            color: Colors.green,
+            color: const Color(0xFF10B981),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildModernStatCard(
+            icon: Icons.shopping_bag_outlined,
+            label: 'Orders',
+            value: _orders.length.toString(),
+            color: const Color(0xFFF59E0B),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStatCard({
+  Widget _buildModernStatCard({
     required IconData icon,
     required String label,
     required String value,
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 28, color: color),
-          ),
-          const SizedBox(height: 12),
+          Icon(icon, size: 24, color: color),
+          const SizedBox(height: 8),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1E293B),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             label,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 12,
               color: Colors.grey.shade600,
               fontWeight: FontWeight.w500,
             ),
@@ -336,17 +391,17 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
     );
   }
 
-  Widget _buildProfileForm() {
+  Widget _buildModernProfileForm() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
@@ -356,49 +411,43 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.edit, color: AppColors.primaryColor, size: 24),
-                const SizedBox(width: 8),
-                const Text(
-                  'Store Information',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
+            const Text(
+              'Store Information',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1E293B),
+              ),
             ),
+            const SizedBox(height: 20),
+            _buildModernImageUpload(),
+            const SizedBox(height: 20),
+            _buildModernTextField(_storeNameController, 'Store Name', Icons.store_outlined),
+            const SizedBox(height: 16),
+            _buildModernTextField(_descriptionController, 'Description', Icons.description_outlined, maxLines: 3),
+            const SizedBox(height: 16),
+            _buildModernTextField(_phoneController, 'Phone', Icons.phone_outlined),
+            const SizedBox(height: 16),
+            _buildModernTextField(_addressController, 'Address', Icons.location_on_outlined, maxLines: 2),
             const SizedBox(height: 24),
-            _buildImageUploadSection(),
-            const SizedBox(height: 24),
-            _buildTextField(_storeNameController, 'Store Name', Icons.store),
-            const SizedBox(height: 16),
-            _buildTextField(_descriptionController, 'Description', Icons.description, maxLines: 3),
-            const SizedBox(height: 16),
-            _buildTextField(_phoneController, 'Phone', Icons.phone),
-            const SizedBox(height: 16),
-            _buildTextField(_addressController, 'Address', Icons.location_on, maxLines: 2),
-            const SizedBox(height: 32),
-            _buildSaveButton(),
+            _buildModernSaveButton(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildImageUploadSection() {
+  Widget _buildModernImageUpload() {
     return Center(
       child: GestureDetector(
         onTap: _updateStoreImage,
         child: Container(
-          width: 120,
-          height: 120,
+          width: 100,
+          height: 100,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: Colors.grey.shade100,
-            border: Border.all(color: Colors.grey.shade300, width: 2),
+            borderRadius: BorderRadius.circular(12),
+            color: const Color(0xFFF8FAFC),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 2),
             image: _storeData?['store_image_url'] != null
                 ? DecorationImage(
               image: NetworkImage(_storeData!['store_image_url']),
@@ -410,10 +459,10 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
               ? Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.camera_alt, size: 32, color: Colors.grey.shade500),
-              const SizedBox(height: 8),
+              Icon(Icons.camera_alt_outlined, size: 24, color: Colors.grey.shade500),
+              const SizedBox(height: 4),
               Text(
-                'Upload Image',
+                'Upload',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey.shade600,
@@ -424,11 +473,11 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
           )
               : Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: Colors.black.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.black.withOpacity(0.4),
             ),
             child: const Center(
-              child: Icon(Icons.camera_alt, color: Colors.white, size: 32),
+              child: Icon(Icons.camera_alt_outlined, color: Colors.white, size: 24),
             ),
           ),
         ),
@@ -436,33 +485,52 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {int maxLines = 1}) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: AppColors.primaryColor),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+  Widget _buildModernTextField(TextEditingController controller, String label, IconData icon, {int maxLines = 1}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF374151),
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF1E293B),
+          ),
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, color: const Color(0xFF6B7280), size: 20),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.primaryColor, width: 2),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFFAFBFC),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          validator: (value) => value?.isEmpty ?? true ? '$label is required' : null,
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.primaryColor, width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-      ),
-      validator: (value) => value?.isEmpty ?? true ? '$label is required' : null,
+      ],
     );
   }
 
-  Widget _buildSaveButton() {
+  Widget _buildModernSaveButton() {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
@@ -470,41 +538,233 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryColor,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
-          elevation: 2,
+          elevation: 0,
         ),
         child: const Text(
           'Save Changes',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProductsTab() {
+  Widget _buildModernProductsTab() {
     return _products.isEmpty
-        ? _buildEmptyState('No products yet', 'Add your first product!', Icons.inventory_2_outlined)
+        ? _buildModernEmptyState('No products yet', 'Add your first product to get started!', Icons.inventory_2_outlined)
         : ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       itemCount: _products.length,
-      itemBuilder: (context, index) => _buildProductCard(_products[index]),
+      itemBuilder: (context, index) => _buildModernProductCard(_products[index]),
     );
   }
 
-  Widget _buildPromosTab() {
+  Widget _buildModernPromosTab() {
     return _promos.isEmpty
-        ? _buildEmptyState('No promos yet', 'Create your first promo!', Icons.local_offer_outlined)
+        ? _buildModernEmptyState('No promos yet', 'Create your first promotional offer!', Icons.local_offer_outlined)
         : ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       itemCount: _promos.length,
-      itemBuilder: (context, index) => _buildPromoCard(_promos[index]),
+      itemBuilder: (context, index) => _buildModernPromoCard(_promos[index]),
     );
   }
 
-  Widget _buildEmptyState(String title, String subtitle, IconData icon) {
+  Widget _buildModernOrdersTab() {
+    if (_orders.isEmpty) {
+      return _buildModernEmptyState(
+        'No Orders Yet',
+        'You haven\'t received any orders yet',
+        Icons.shopping_bag_outlined,
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: _orders.length,
+      itemBuilder: (context, index) {
+        final order = _orders[index];
+        final orderItems = order['order_items'] as List;
+        final status = order['status'] as String;
+        final orderNumber = order['order_number'] as String;
+        final orderDate = DateTime.parse(order['created_at'] as String);
+        final formattedDate = '${orderDate.day}/${orderDate.month}/${orderDate.year}';
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Order #$orderNumber',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(status).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        _getStatusText(status),
+                        style: TextStyle(
+                          color: _getStatusColor(status),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  formattedDate,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...orderItems.map((item) {
+                  final product = item['products'];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            product['images'][0] ?? '',
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.image_not_supported_outlined,
+                                  color: Colors.grey[400],
+                                  size: 20,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product['name'] ?? 'Unknown Product',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Qty: ${item['quantity']}',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                const SizedBox(height: 12),
+                if (status == 'processing' || status == 'waiting_shipment')
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _updateOrderStatus(order['id'], 'shipped'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Kirimkan Barang',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  )
+                else if (status == 'shipped')
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _updateOrderStatus(order['id'], 'delivered'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Terima',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildModernEmptyState(String title, String subtitle, IconData icon) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -512,25 +772,27 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(20),
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: Icon(icon, size: 64, color: Colors.grey.shade400),
+            child: Icon(icon, size: 48, color: const Color(0xFF94A3B8)),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           Text(
             title,
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: Color(0xFF1E293B),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
+            textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 14,
               color: Colors.grey.shade600,
             ),
           ),
@@ -539,7 +801,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
     );
   }
 
-  Widget _buildProductCard(Map<String, dynamic> product) {
+  Widget _buildModernProductCard(Map<String, dynamic> product) {
     final hasImage = product['images'] != null && (product['images'] as List).isNotEmpty;
     final imageUrl = hasImage ? product['images'][0] : null;
 
@@ -547,180 +809,277 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Hero(
-          tag: 'product_${product['id']}',
-          child: Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.grey.shade100,
-              image: imageUrl != null ? DecorationImage(
-                image: NetworkImage(imageUrl),
-                fit: BoxFit.cover,
-              ) : null,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: const Color(0xFFF8FAFC),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                image: imageUrl != null ? DecorationImage(
+                  image: NetworkImage(imageUrl),
+                  fit: BoxFit.cover,
+                ) : null,
+              ),
+              child: imageUrl == null
+                  ? Icon(Icons.image_outlined, color: Colors.grey.shade400, size: 24)
+                  : null,
             ),
-            child: imageUrl == null
-                ? Icon(Icons.image_outlined, color: Colors.grey.shade400, size: 24)
-                : null,
-          ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product['name'] ?? 'Unnamed Product',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      _buildModernChip(
+                        'Stock: ${product['stock']}',
+                        const Color(0xFF3B82F6),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildModernChip(
+                        formatRupiah(product['price']),
+                        const Color(0xFF10B981),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Direct Edit and Delete buttons
+            Row(
+              children: [
+                InkWell(
+                  onTap: () => _showEditProductDialog(product),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      Icons.edit_outlined,
+                      size: 20,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                InkWell(
+                  onTap: () => _showDeleteProductDialog(product['id']),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      size: 20,
+                      color: Color(0xFFEF4444),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        title: Text(
-          product['name'] ?? 'Unnamed Product',
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Row(
-            children: [
-              _buildChip('Stock: ${product['stock']}', Colors.orange),
-              const SizedBox(width: 8),
-              _buildChip('Rp${product['price']}', Colors.green),
-            ],
-          ),
-        ),
-        trailing: _buildPopupMenu('product', product),
       ),
     );
   }
 
-  Widget _buildPromoCard(Map<String, dynamic> promo) {
+  Widget _buildModernPromoCard(Map<String, dynamic> promo) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: Colors.red.shade50,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(Icons.local_offer, color: Colors.red.shade400, size: 28),
-        ),
-        title: Text(
-          promo['title'] ?? 'Unnamed Promo',
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildChip('Code: ${promo['code']}', AppColors.info),
-              const SizedBox(height: 4),
-              _buildChip(
-                'Discount: ${promo['discount_value']}${promo['discount_type'] == 'percentage' ? '%' : ' Rp'}',
-                Colors.purple,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-            ],
-          ),
+              child: Icon(
+                Icons.local_offer_outlined,
+                color: AppColors.primaryColor,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    promo['title'] ?? 'Unnamed Promo',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildModernChip(
+                        'Code: ${promo['code']}',
+                        const Color(0xFF8B5CF6),
+                      ),
+                      const SizedBox(height: 4),
+                      _buildModernChip(
+                        'Discount: ${promo['discount_value']}${promo['discount_type'] == 'percentage' ? '%' : ' Rp'}',
+                        const Color(0xFFF59E0B),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Direct Edit and Delete buttons
+            Row(
+              children: [
+                InkWell(
+                  onTap: () => _showEditPromoDialog(promo),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      Icons.edit_outlined,
+                      size: 20,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                InkWell(
+                  onTap: () => _showDeletePromoDialog(promo['id']),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      size: 20,
+                      color: Color(0xFFEF4444),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        trailing: _buildPopupMenu('promo', promo),
       ),
     );
   }
 
-  Widget _buildChip(String text, Color color) {
+  Widget _buildModernChip(String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         text,
         style: TextStyle(
-          color: color == Colors.orange ? Colors.orange.shade700 :
-          color == Colors.green ? Colors.green.shade700 :
-          color == AppColors.info ? AppColors.info :
-          color == Colors.purple ? Colors.purple.shade700 :
-          color == Colors.red ? Colors.red.shade700 : color,
+          color: color,
           fontSize: 12,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
   }
 
-  Widget _buildPopupMenu(String type, Map<String, dynamic> item) {
-    return PopupMenuButton(
-      icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          value: 'edit',
-          child: Row(
-            children: [
-              Icon(Icons.edit, size: 20, color: AppColors.primaryColor),
-              const SizedBox(width: 8),
-              const Text('Edit'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'delete',
-          child: Row(
-            children: [
-              const Icon(Icons.delete, size: 20, color: Colors.red),
-              const SizedBox(width: 8),
-              const Text('Delete', style: TextStyle(color: Colors.red)),
-            ],
-          ),
-        ),
-      ],
-      onSelected: (value) {
-        if (value == 'edit') {
-          type == 'product' ? _showEditProductDialog(item) : _showEditPromoDialog(item);
-        } else if (value == 'delete') {
-          type == 'product' ? _showDeleteProductDialog(item['id']) : _showDeletePromoDialog(item['id']);
-        }
-      },
-    );
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'waiting_shipment':
+        return const Color(0xFFF59E0B);
+      case 'shipped':
+        return const Color(0xFF3B82F6);
+      case 'delivered':
+        return const Color(0xFF10B981);
+      default:
+        return const Color(0xFF6B7280);
+    }
   }
 
-  // Dialog Methods (unchanged functionality)
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'waiting_shipment':
+        return 'Menunggu Pengiriman';
+      case 'shipped':
+        return 'Dalam Perjalanan';
+      case 'delivered':
+        return 'Selesai';
+      default:
+        return status;
+    }
+  }
+
+  // Dialog Methods
   void _showDeleteDialog(String title, String content, String id, Future<bool> Function(String) deleteFunction) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(title),
-        content: Text(content),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+            color: Color(0xFF1E293B),
+          ),
+        ),
+        content: Text(
+          content,
+          style: const TextStyle(
+            fontWeight: FontWeight.w400,
+            fontSize: 14,
+            color: Color(0xFF64748B),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade600,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -740,8 +1099,20 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                 _showSnackBar('Error deleting ${title.toLowerCase().split(' ')[1]}: $e');
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -762,7 +1133,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
       if (image != null) {
         setState(() => _isLoading = true);
         final file = File(image.path);
-        
+
         final success = await StoreService.updateStoreImage(
           _storeData!['id'],
           file,
@@ -773,7 +1144,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
 
         if (success) {
           _showSnackBar('Store image updated successfully');
-          _loadStoreData(); // Reload store data to show new image
+          _loadStoreData();
         } else {
           _showSnackBar('Failed to update store image');
         }
@@ -866,4 +1237,14 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
       _showDeleteDialog('Delete Product', 'Are you sure you want to delete this product?', productId, StoreService.deleteProduct);
   void _showDeletePromoDialog(String promoId) =>
       _showDeleteDialog('Delete Promo', 'Are you sure you want to delete this promo?', promoId, StoreService.deletePromo);
+
+  Future<void> _updateOrderStatus(String orderId, String status) async {
+    try {
+      await OrderService.updateOrderStatus(orderId, status, widget.storeId);
+      await _loadStoreData();
+      _showSnackBar('Order status updated successfully');
+    } catch (e) {
+      _showSnackBar('Error updating order status: $e');
+    }
+  }
 }

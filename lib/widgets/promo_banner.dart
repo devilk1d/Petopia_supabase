@@ -239,7 +239,7 @@ class PromoBanner extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: Colors.white.withOpacity(0.1),
                 ),
-              ),
+                ),
             ),
 
           // Content

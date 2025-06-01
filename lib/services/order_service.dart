@@ -7,6 +7,8 @@ import 'auth_service.dart';
 import 'cart_service.dart';
 import 'promo_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:math';
+import '../services/product_service.dart';
 
 class OrderService {
   static final _client = SupabaseConfig.client;
@@ -16,6 +18,7 @@ class OrderService {
     required Map<String, dynamic> shippingAddress,
     required String paymentMethodId,
     required String shippingMethodId,
+    required List<Map<String, dynamic>> selectedItems,
     String? promoCode,
     String? notes,
   }) async {
@@ -23,16 +26,15 @@ class OrderService {
       final userId = AuthService.getCurrentUserId();
       if (userId == null) throw Exception('User not logged in');
 
-      // Get cart items
-      final cartItems = await CartService.getCartItems();
-      if (cartItems.isEmpty) throw Exception('Cart is empty');
+      // Use selected items instead of all cart items
+      if (selectedItems.isEmpty) throw Exception('No items selected');
 
       // Calculate totals
       double subtotal = 0;
       double discountAmount = 0;
       String? promoId;
 
-      for (var item in cartItems) {
+      for (var item in selectedItems) {
         final price = item['price'] as double;
         final quantity = item['quantity'] as int;
         subtotal += price * quantity;
@@ -52,9 +54,15 @@ class OrderService {
 
       final totalAmount = subtotal - discountAmount + shippingCost;
 
+      // Generate order number
+      final random = Random();
+      final randomNumber = random.nextInt(9000000) + 1000000; // 7 digit random
+      final orderNumber = 'INV-$randomNumber';
+
       // Create order dengan explicit user_id
       final orderData = {
         'user_id': userId,
+        'order_number': orderNumber,
         'total_amount': totalAmount,
         'shipping_cost': shippingCost,
         'discount_amount': discountAmount,
@@ -79,8 +87,9 @@ class OrderService {
 
       final orderId = orderResponse['id'];
 
-      // Create order items
-      for (var cartItem in cartItems) {
+      // Create order items and update product stock
+      for (var cartItem in selectedItems) {
+        // Create order item
         await _client
             .from('order_items')
             .insert({
@@ -92,6 +101,13 @@ class OrderService {
           'variant': cartItem['variant'] ?? '',
           'created_at': DateTime.now().toIso8601String(),
         });
+
+        // Update product stock
+        await ProductService.updateProductStock(
+          cartItem['product_id'],
+          cartItem['quantity'],
+          variant: cartItem['variant'],
+        );
       }
 
       // Use promo code if applied
@@ -99,8 +115,10 @@ class OrderService {
         await PromoService.usePromoCode(promoId);
       }
 
-      // Clear cart after successful order
-      await CartService.clearCart();
+      // Remove only the ordered items from cart
+      for (var cartItem in selectedItems) {
+        await CartService.removeFromCart(cartItem['id']);
+      }
 
       return orderResponse;
     } catch (e) {
@@ -113,6 +131,8 @@ class OrderService {
         throw Exception('Invalid data: Some referenced data is missing.');
       } else if (e.toString().contains('violates check constraint')) {
         throw Exception('Invalid data: Please check your order details.');
+      } else if (e.toString().contains('Insufficient stock')) {
+        throw Exception('Some products have insufficient stock. Please check your cart.');
       } else {
         throw Exception('Failed to create order: $e');
       }
@@ -268,20 +288,42 @@ class OrderService {
   }
 
   // Update order status
-  static Future<void> updateOrderStatus(String orderId, String status) async {
+  static Future<void> updateOrderStatus(String orderId, String status, String sellerId) async {
     try {
-      final userId = AuthService.getCurrentUserId();
-      if (userId == null) throw Exception('User not logged in');
+      // Get the order without joining order_items
+      final order = await _client
+          .from('orders')
+          .select('*')
+          .eq('id', orderId)
+          .single();
 
+      if (order == null) {
+        throw Exception('Order not found');
+      }
+
+      // Get order_items for this order
+      final orderItems = await _client
+          .from('order_items')
+          .select('seller_id')
+          .eq('order_id', orderId);
+
+      bool isOrderFromSeller = (orderItems as List).any((item) => item['seller_id'] == sellerId);
+
+      if (!isOrderFromSeller) {
+        throw Exception('You are not authorized to update this order');
+      }
+
+      // Update the order status
       await _client
           .from('orders')
           .update({
-        'status': status,
-        'updated_at': DateTime.now().toIso8601String(),
-      })
-          .eq('id', orderId)
-          .eq('user_id', userId);
+            'status': status,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', orderId);
+
     } catch (e) {
+      print('Error updating order status: $e');
       throw Exception('Failed to update order status: $e');
     }
   }

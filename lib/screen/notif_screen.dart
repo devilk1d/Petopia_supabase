@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
+import '../services/notification_service.dart';
+import '../models/notification_model.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import 'package:intl/intl.dart';
+import '../services/auth_service.dart';
+import 'dart:async';
 
 class NotifScreen extends StatefulWidget {
   const NotifScreen({Key? key}) : super(key: key);
@@ -11,110 +17,177 @@ class NotifScreen extends StatefulWidget {
 class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStateMixin {
   // Tab controller for different notification categories
   late TabController _tabController;
-
-  // Sample notification data
-  final List<Map<String, dynamic>> _notifications = [
-    {
-      'type': 'transaction',
-      'title': 'Pesanan Dikirim',
-      'description': 'Pesanan Royal Canin Sensible Adult Dry Cat Food sedang dalam pengiriman.',
-      'time': '20 menit yang lalu',
-      'isRead': false,
-      'icon': Icons.local_shipping_outlined,
-      'iconColor': Colors.blue,
-    },
-    {
-      'type': 'promo',
-      'title': 'Diskon 25% PETKIT',
-      'description': 'Dapatkan diskon 25% untuk seluruh produk PETKIT Indonesia. Periode promo sampai 30 April 2025.',
-      'time': '1 jam yang lalu',
-      'isRead': false,
-      'icon': Icons.local_offer_outlined,
-      'iconColor': Colors.orange,
-    },
-    {
-      'type': 'transaction',
-      'title': 'Pesanan Selesai',
-      'description': 'Pesanan Ceramic Pet Bowl telah diterima. Silakan berikan penilaian.',
-      'time': '3 jam yang lalu',
-      'isRead': true,
-      'icon': Icons.check_circle_outline,
-      'iconColor': Colors.green,
-    },
-    {
-      'type': 'promo',
-      'title': 'Promo Makanan Hewan',
-      'description': 'Nikmati diskon hingga 40% untuk seluruh produk makanan kucing dan anjing.',
-      'time': '5 jam yang lalu',
-      'isRead': true,
-      'icon': Icons.pets_outlined,
-      'iconColor': AppColors.primaryColor,
-    },
-    {
-      'type': 'transaction',
-      'title': 'Pembayaran Berhasil',
-      'description': 'Pembayaran untuk PETKIT YumShare Gemini Dual-hopper with Camera telah berhasil.',
-      'time': '1 hari yang lalu',
-      'isRead': true,
-      'icon': Icons.payment_outlined,
-      'iconColor': Colors.green,
-    },
-    {
-      'type': 'system',
-      'title': 'Update Aplikasi',
-      'description': 'Update aplikasi Petopia ke versi terbaru untuk mendapatkan fitur baru.',
-      'time': '2 hari yang lalu',
-      'isRead': true,
-      'icon': Icons.system_update_outlined,
-      'iconColor': Colors.purple,
-    },
-  ];
-
-  // Filter notifications based on selected tab
-  List<Map<String, dynamic>> get _filteredNotifications {
-    switch (_tabController.index) {
-      case 0: // All notifications
-        return _notifications;
-      case 1: // Transactions
-        return _notifications.where((n) => n['type'] == 'transaction').toList();
-      case 2: // Promos
-        return _notifications.where((n) => n['type'] == 'promo').toList();
-      case 3: // System
-        return _notifications.where((n) => n['type'] == 'system').toList();
-      default:
-        return _notifications;
-    }
-  }
+  List<NotificationModel> _notifications = [];
+  bool _isLoading = true;
+  String? _error;
+  Timer? _timer;
+  Set<String> _readOrderIds = {};
+  Set<String> _readPromoSystemIds = {};
 
   @override
   void initState() {
     super.initState();
+    // Initialize timeago with Indonesian locale
+    timeago.setLocaleMessages('id', timeago.IdMessages());
+    
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       setState(() {});
+    });
+    _loadNotifications();
+    _setupRealtimeSubscription();
+    _timer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted) setState(() {});
     });
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
 
-  // Mark all notifications as read
-  void _markAllAsRead() {
-    setState(() {
-      for (var notification in _notifications) {
-        notification['isRead'] = true;
+  Future<void> _loadNotifications() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+
+      final notifications = await NotificationService.getUserNotifications();
+      
+      if (mounted) {
+        setState(() {
+          _notifications = notifications;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load notifications: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _setupRealtimeSubscription() {
+    final userId = AuthService.getCurrentUserId();
+    if (userId == null) return;
+
+    NotificationService.supabase
+        .from('notifications')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
+        .listen((data) {
+      if (mounted) {
+        setState(() {
+          _notifications = NotificationModel.fromJsonList(data);
+        });
       }
     });
   }
 
-  // Mark a single notification as read
-  void _markAsRead(Map<String, dynamic> notification) {
+  // Filter notifications based on selected tab
+  List<NotificationModel> get _filteredNotifications {
+    switch (_tabController.index) {
+      case 0: // All notifications
+        return _notifications;
+      case 1: // Transactions
+        return _notifications.where((n) => n.type == 'order').toList();
+      case 2: // Promos
+        return _notifications.where((n) => n.type == 'promo').toList();
+      case 3: // System
+        return _notifications.where((n) => n.type == 'system').toList();
+      default:
+        return _notifications;
+    }
+  }
+
+  // Mark all notifications as read (local only)
+  Future<void> _markAllAsRead() async {
     setState(() {
-      notification['isRead'] = true;
+      _readOrderIds.addAll(_notifications.where((n) => n.type == 'order').map((n) => n.id));
+      _readPromoSystemIds.addAll(_notifications.where((n) => n.type == 'promo' || n.type == 'system').map((n) => n.id));
     });
+  }
+
+  // Mark a single notification as read (local only)
+  Future<void> _markAsRead(NotificationModel notification) async {
+    setState(() {
+      if (notification.type == 'order') {
+        _readOrderIds.add(notification.id);
+      } else if (notification.type == 'promo' || notification.type == 'system') {
+        _readPromoSystemIds.add(notification.id);
+      }
+    });
+  }
+
+  // Get icon and color based on notification type and data
+  Map<String, dynamic> _getNotificationStyle(NotificationModel notification) {
+    if (notification.type == 'order') {
+      final status = notification.data?['status'] as String?;
+      final paymentStatus = notification.data?['payment_status'] as String?;
+
+      // Pembayaran Berhasil
+      if (notification.title == 'Pembayaran Berhasil') {
+        return {
+          'icon': Icons.verified,
+          'color': AppColors.success,
+        };
+      }
+      if (paymentStatus == 'pending') {
+        return {
+          'icon': Icons.payment_outlined,
+          'color': AppColors.warning,
+        };
+      } else if (paymentStatus == 'failed') {
+        return {
+          'icon': Icons.error_outline,
+          'color': AppColors.error,
+        };
+      } else {
+        switch (status) {
+          case 'processing':
+            return {
+              'icon': Icons.inventory_2_outlined,
+              'color': AppColors.primaryColor,
+            };
+          case 'waiting_shipment':
+            return {
+              'icon': Icons.schedule_outlined,
+              'color': AppColors.primaryColor,
+            };
+          case 'shipped':
+            return {
+              'icon': Icons.local_shipping_outlined,
+              'color': Colors.blue,
+            };
+          case 'delivered':
+            return {
+              'icon': Icons.check_circle_outline,
+              'color': AppColors.success,
+            };
+          default:
+            return {
+              'icon': Icons.shopping_bag_outlined,
+              'color': Colors.grey,
+            };
+        }
+      }
+    } else if (notification.type == 'promo') {
+      return {
+        'icon': Icons.local_offer_outlined,
+        'color': Colors.orange,
+      };
+    } else {
+      return {
+        'icon': Icons.notifications_outlined,
+        'color': Colors.grey,
+      };
+    }
   }
 
   @override
@@ -127,9 +200,13 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
             _buildHeader(),
             _buildTabs(),
             Expanded(
-              child: _filteredNotifications.isEmpty
-                  ? _buildEmptyState()
-                  : _buildNotificationsList(),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? _buildErrorState()
+                      : _filteredNotifications.isEmpty
+                          ? _buildEmptyState()
+                          : _buildNotificationsList(),
             ),
           ],
         ),
@@ -139,7 +216,7 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
 
   Widget _buildHeader() {
     // Count unread notifications
-    final int unreadCount = _notifications.where((n) => !n['isRead']).length;
+    final int unreadCount = _notifications.where((n) => !n.isRead).length;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -178,24 +255,24 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
           // Mark all as read button (only if there are unread notifications)
           unreadCount > 0
               ? GestureDetector(
-            onTap: _markAllAsRead,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: const Text(
-                'Baca Semua',
-                style: TextStyle(
-                  fontFamily: 'SF Pro Display',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryColor,
-                ),
-              ),
-            ),
-          )
+                  onTap: _markAllAsRead,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Text(
+                      'Baca Semua',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro Display',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryColor,
+                      ),
+                    ),
+                  ),
+                )
               : const SizedBox(width: 40),
         ],
       ),
@@ -255,17 +332,40 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildNotificationItem(Map<String, dynamic> notification) {
-    final bool isUnread = !notification['isRead'];
+  Widget _buildNotificationItem(NotificationModel notification) {
+    final bool isPromoOrSystem = notification.type == 'promo' || notification.type == 'system';
+    final bool isOrder = notification.type == 'order';
+    final bool isUnread = isPromoOrSystem
+        ? !_readPromoSystemIds.contains(notification.id)
+        : !_readOrderIds.contains(notification.id);
+    final style = _getNotificationStyle(notification);
 
     return GestureDetector(
       onTap: () {
-        // Mark as read when tapped
-        if (!notification['isRead']) {
+        // Mark as read hanya untuk promo/sistem
+        if (isPromoOrSystem && !notification.isRead) {
           _markAsRead(notification);
         }
-
-        // Here you could navigate to relevant screens based on notification type
+        // Mark as read lokal untuk order
+        if (isOrder && !_readOrderIds.contains(notification.id)) {
+          setState(() {
+            _readOrderIds.add(notification.id);
+          });
+        }
+        // Navigate based on notification type and data
+        if (notification.type == 'order' && notification.data?['order_id'] != null) {
+          Navigator.pushNamed(
+            context,
+            '/order-detail',
+            arguments: notification.data!['order_id'],
+          );
+        } else if (notification.type == 'promo' && notification.data?['promo_id'] != null) {
+          Navigator.pushNamed(
+            context,
+            '/promo',
+            arguments: notification.data!['promo_id'],
+          );
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -278,12 +378,12 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: notification['iconColor'].withOpacity(0.1),
+                color: style['color'].withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                notification['icon'],
-                color: notification['iconColor'],
+                style['icon'],
+                color: style['color'],
                 size: 24,
               ),
             ),
@@ -295,12 +395,12 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title with unread indicator
+                  // Title with unread indicator (semua tipe)
                   Row(
                     children: [
                       Expanded(
                         child: Text(
-                          notification['title'],
+                          notification.title,
                           style: TextStyle(
                             fontFamily: 'SF Pro Display',
                             fontSize: 16,
@@ -325,7 +425,7 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
 
                   // Description
                   Text(
-                    notification['description'],
+                    notification.message,
                     style: TextStyle(
                       fontFamily: 'SF Pro Display',
                       fontSize: 14,
@@ -338,7 +438,7 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
 
                   // Time ago
                   Text(
-                    notification['time'],
+                    timeago.format(notification.createdAt, locale: 'id'),
                     style: TextStyle(
                       fontFamily: 'SF Pro Display',
                       fontSize: 12,
@@ -383,6 +483,54 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
               color: Colors.grey.shade600,
             ),
             textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 80,
+            color: Colors.red.shade300,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Terjadi Kesalahan',
+            style: TextStyle(
+              fontFamily: 'SF Pro Display',
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _error ?? 'Unknown error',
+            style: TextStyle(
+              fontFamily: 'SF Pro Display',
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadNotifications,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Coba Lagi'),
           ),
         ],
       ),

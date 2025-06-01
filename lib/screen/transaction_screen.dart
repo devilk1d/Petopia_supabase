@@ -349,6 +349,10 @@ class _TransactionScreenState extends State<TransactionScreen> {
         statusColor = AppColors.warning;
         statusText = 'Menunggu Pembayaran';
         break;
+      case 'ON_DELIVERY':
+        statusColor = Colors.blue;
+        statusText = 'Dalam Perjalanan';
+        break;
       case 'ONGOING':
         statusColor = AppColors.primaryColor;
         statusText = 'Dalam Proses';
@@ -543,7 +547,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        paymentMethod,
+                        _formatPaymentMethod(paymentMethod),
                         style: TextStyle(
                           fontFamily: 'SF Pro Display',
                           fontSize: 11,
@@ -668,5 +672,14 @@ class _TransactionScreenState extends State<TransactionScreen> {
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]}.',
     )}';
+  }
+
+  String _formatPaymentMethod(String method) {
+    final lower = method.toLowerCase();
+    if (lower.contains('alfamart') && lower.contains('lawson')) {
+      // Untuk string seperti "Alfamart / Alfamidi / Lawson / Dan+Dan"
+      return method.replaceAll(' / Lawson', '\nLawson');
+    }
+    return method;
   }
 }

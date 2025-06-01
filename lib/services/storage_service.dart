@@ -24,11 +24,12 @@ class StorageService {
     try {
       final fileExt = path.extension(imageFile.path); // e.g., .jpg
       final fileName = '${_uuid.v4()}$fileExt'; // Generate unique filename
+      final storagePath = '$folder/$fileName';
       
       // Upload the file to Supabase storage
       final response = await _supabase.storage
-          .from(folder)
-          .upload(fileName, imageFile);
+          .from('petopia')
+          .upload(storagePath, imageFile);
 
       if (response.isEmpty) {
         throw Exception('Failed to upload image');
@@ -36,8 +37,8 @@ class StorageService {
 
       // Get the public URL
       final imageUrl = _supabase.storage
-          .from(folder)
-          .getPublicUrl(fileName);
+          .from('petopia')
+          .getPublicUrl(storagePath);
 
       return imageUrl;
     } catch (e) {

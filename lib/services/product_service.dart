@@ -561,4 +561,77 @@ class ProductService {
       return [];
     }
   }
+
+  // Update product stock - AUTH REQUIRED
+  static Future<bool> updateProductStock(String productId, int quantity, {String? variant}) async {
+    try {
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
+      // Get current product data
+      final product = await _client
+          .from('products')
+          .select('stock, variants')
+          .eq('id', productId)
+          .single();
+
+      if (product == null) {
+        throw Exception('Product not found');
+      }
+
+      // Handle variant stock
+      if (variant != null && product['variants'] != null) {
+        final variants = product['variants'] as Map<String, dynamic>;
+        if (variants.containsKey('name') && variants.containsKey('price')) {
+          final variantNames = variants['name'] as List;
+          final variantIndex = variantNames.indexOf(variant);
+          
+          if (variantIndex == -1) {
+            throw Exception('Variant not found');
+          }
+
+          // Get current stock for the variant
+          final currentStock = product['stock'] as int;
+          final newStock = currentStock - quantity;
+
+          if (newStock < 0) {
+            throw Exception('Insufficient stock for variant: $variant');
+          }
+
+          // Update stock
+          await _client
+              .from('products')
+              .update({
+                'stock': newStock,
+                'updated_at': DateTime.now().toIso8601String(),
+              })
+              .eq('id', productId);
+
+          return true;
+        }
+      }
+
+      // Handle regular product stock
+      final currentStock = product['stock'] as int;
+      final newStock = currentStock - quantity;
+
+      if (newStock < 0) {
+        throw Exception('Insufficient stock');
+      }
+
+      // Update stock
+      await _client
+          .from('products')
+          .update({
+            'stock': newStock,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', productId);
+
+      return true;
+    } catch (e) {
+      print('Error updating product stock: $e');
+      throw Exception('Failed to update product stock: $e');
+    }
+  }
 }

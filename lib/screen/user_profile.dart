@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/user_service.dart';
 import 'dart:async';  // Add this import for StreamSubscription
+import 'dart:io';
+import '../services/storage_service.dart';
+import 'store_management_screen.dart';
 
 class UserProfile extends StatefulWidget {
   const UserProfile({Key? key}) : super(key: key);
@@ -13,6 +16,7 @@ class _UserProfileState extends State<UserProfile> {
   bool _isLoading = true;
   Map<String, dynamic>? _userData;
   final _formKey = GlobalKey<FormState>();
+  File? _selectedImage;
   
   // Controllers for editable fields
   late TextEditingController _nameController;
@@ -20,6 +24,9 @@ class _UserProfileState extends State<UserProfile> {
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
+
+  // Tambahkan variabel state untuk stores
+  List<Map<String, dynamic>> _userStores = [];
 
   @override
   void initState() {
@@ -30,6 +37,7 @@ class _UserProfileState extends State<UserProfile> {
     _phoneController = TextEditingController();
     _addressController = TextEditingController();
     _loadUserData();
+    _loadUserStores();
   }
 
   @override
@@ -40,6 +48,15 @@ class _UserProfileState extends State<UserProfile> {
     _phoneController.dispose();
     _addressController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final image = await StorageService.pickImage();
+    if (image != null) {
+      setState(() {
+        _selectedImage = image;
+      });
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -68,6 +85,13 @@ class _UserProfileState extends State<UserProfile> {
     }
   }
 
+  Future<void> _loadUserStores() async {
+    final stores = await UserService.getUserStores();
+    setState(() {
+      _userStores = stores;
+    });
+  }
+
   Future<void> _saveProfile() async {
     try {
       setState(() => _isLoading = true);
@@ -87,6 +111,14 @@ class _UserProfileState extends State<UserProfile> {
         'phone': _phoneController.text.trim(),
         'address': _addressController.text.trim(),
       };
+
+      // Upload image if selected
+      if (_selectedImage != null) {
+        final imageUrl = await StorageService.uploadImage(_selectedImage!, 'profile');
+        if (imageUrl != null) {
+          data['profile_image_url'] = imageUrl;
+        }
+      }
 
       await UserService.updateProfile(data);
 
@@ -163,7 +195,7 @@ class _UserProfileState extends State<UserProfile> {
                                     fontFamily: 'SF Pro Display',
                                     fontSize: 20,
                                     color: Colors.white,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
@@ -198,70 +230,36 @@ class _UserProfileState extends State<UserProfile> {
                       child: Column(
                         children: [
                           // Profile Picture
-                          Stack(
-                            children: [
-                              Container(
-                                width: 100,
-                                height: 100,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _userData?['profile_image_url'] == null
-                                      ? Colors.primaries[(_nameController.text.isEmpty ? 0 : _nameController.text.hashCode) % Colors.primaries.length].withOpacity(0.2)
+                          GestureDetector(
+                            onTap: _pickImage,
+                            child: Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 50,
+                                  backgroundColor: Colors.grey.shade200,
+                                  backgroundImage: _selectedImage != null
+                                      ? FileImage(_selectedImage!)
+                                      : (_userData?['profile_image_url'] != null
+                                          ? NetworkImage(_userData!['profile_image_url'])
+                                          : null) as ImageProvider?,
+                                  child: _selectedImage == null && _userData?['profile_image_url'] == null
+                                      ? const Icon(Icons.person, size: 50, color: Colors.grey)
                                       : null,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 5),
-                                    ),
-                                  ],
                                 ),
-                                child: _userData?['profile_image_url'] != null
-                                    ? ClipOval(
-                                        child: Image.network(
-                                          _userData!['profile_image_url'],
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return _buildDefaultAvatar();
-                                          },
-                                        ),
-                                      )
-                                    : _buildDefaultAvatar(),
-                              ),
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: GestureDetector(
-                                  onTap: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Image upload will be implemented soon'),
-                                        backgroundColor: Colors.orange,
-                                      ),
-                                    );
-                                  },
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
                                   child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFB60051),
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFB60051),
                                       shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.2),
-                                          blurRadius: 5,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
                                     ),
-                                    child: const Icon(
-                                      Icons.camera_alt,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
+                                    child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 20),
 
@@ -317,14 +315,15 @@ class _UserProfileState extends State<UserProfile> {
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.save_outlined, size: 20),
+                                  Icon(Icons.save_outlined, size: 20, color: Colors.white,),
                                   SizedBox(width: 8),
                                   Text(
                                     'Save Changes',
                                     style: TextStyle(
                                       fontFamily: 'SF Pro Display',
                                       fontSize: 16,
-                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ],
@@ -336,6 +335,92 @@ class _UserProfileState extends State<UserProfile> {
                     ),
                   ),
                 ),
+
+                // Di dalam build, setelah form profile, tampilkan daftar toko
+                if (_userStores.isNotEmpty) ...[
+                  const SizedBox(height: 30),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'My Stores',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro Display',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    itemCount: _userStores.length,
+                    itemBuilder: (context, index) {
+                      final store = _userStores[index];
+                      final isActive = store['id'] == StoreManagementScreen.activeStoreId;
+                      return GestureDetector(
+                        onTap: () {
+                          StoreManagementScreen.activeStoreId = store['id'];
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => StoreManagementScreen(storeId: store['id']),
+                            ),
+                          ).then((_) => setState(() {}));
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isActive ? Color(0xFFB60051) : Color(0xFFE2E8F0), width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.store_rounded, color: isActive ? Color(0xFFB60051) : Colors.grey, size: 32),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  store['store_name'] ?? 'Unnamed Store',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                ),
+                              ),
+                              if (isActive)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFFB60051),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'Active',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
           ),

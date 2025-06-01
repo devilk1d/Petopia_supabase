@@ -118,4 +118,16 @@ class UserService {
       rethrow;
     }
   }
+
+  // Subscribe to user's store profiles (realtime)
+  static Stream<List<Map<String, dynamic>>> subscribeToUserStores() {
+    final userId = AuthService.getCurrentUserId();
+    if (userId == null) throw Exception('User not logged in');
+    return _client
+        .from('sellers')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
+        .order('created_at')
+        .map((event) => event.cast<Map<String, dynamic>>());
+  }
 } 

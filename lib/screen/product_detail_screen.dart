@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import '../utils/colors.dart';
 import '../models/product_model.dart';
 import '../services/product_service.dart';
+import '../services/wishlist_service.dart';
+import '../services/auth_service.dart';
 import 'package:intl/intl.dart';
 import '../services/cart_service.dart';
 
@@ -19,16 +21,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
   int _quantity = 1;
   bool _isFavorite = false;
   bool _isLoading = true;
+  bool _isWishlistLoading = false;
   String? _error;
   ProductModel? _product;
   double _currentPrice = 0;
-
-  final List<String> _images = [
-    'assets/images/products/petkit_feeder.png',
-    'assets/images/products/petkit_3.jpg',
-    'assets/images/products/petkit_4.jpg',
-    'assets/images/products/petkit_5.png',
-  ];
 
   late PageController _pageController;
   late AnimationController _animationController;
@@ -54,7 +50,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
       ),
     );
     _animationController.forward();
-    
+
     // Load product data
     Future.delayed(Duration.zero, _loadProduct);
   }
@@ -67,12 +63,20 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
       setState(() => _isLoading = true);
       final product = await ProductService.getProductById(productId);
 
-      if (mounted) {
+      if (mounted && product != null) {
         setState(() {
           _product = product;
-          _currentPrice = product?.price ?? 0;
+          _currentPrice = product.price;
           _isLoading = false;
-          _error = product == null ? 'Product not found' : null;
+          _error = null;
+        });
+
+        // Check wishlist status if user is logged in
+        await _checkWishlistStatus();
+      } else if (mounted) {
+        setState(() {
+          _error = 'Product not found';
+          _isLoading = false;
         });
       }
     } catch (e) {
@@ -83,6 +87,137 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
         });
       }
     }
+  }
+
+  Future<void> _checkWishlistStatus() async {
+    if (_product == null || !AuthService.isAuthenticated) return;
+
+    try {
+      final isInWishlist = await WishlistService.isInWishlist(_product!.id);
+      if (mounted) {
+        setState(() {
+          _isFavorite = isInWishlist;
+        });
+      }
+    } catch (e) {
+      print('Error checking wishlist status: $e');
+    }
+  }
+
+  Future<void> _toggleWishlist() async {
+    if (_product == null) return;
+
+    // Check if user is logged in
+    if (!AuthService.isAuthenticated) {
+      _showLoginDialog();
+      return;
+    }
+
+    if (_isWishlistLoading) return;
+
+    setState(() => _isWishlistLoading = true);
+
+    try {
+      final newWishlistStatus = await WishlistService.toggleWishlist(_product!.id);
+
+      if (mounted) {
+        setState(() {
+          _isFavorite = newWishlistStatus;
+          _isWishlistLoading = false;
+        });
+
+        // Show feedback to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              newWishlistStatus
+                  ? 'Added to wishlist!'
+                  : 'Removed from wishlist!',
+            ),
+            backgroundColor: newWishlistStatus
+                ? AppColors.success
+                : AppColors.warning,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isWishlistLoading = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update wishlist: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showLoginDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Login Required',
+            style: TextStyle(
+              fontFamily: 'SF Pro Display',
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          content: const Text(
+            'Please login to add products to your wishlist.',
+            style: TextStyle(
+              fontFamily: 'SF Pro Display',
+              fontSize: 14,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  fontFamily: 'SF Pro Display',
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.pushNamed(context, '/login');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Login',
+                style: TextStyle(
+                  fontFamily: 'SF Pro Display',
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _updateSelectedVariant(String variantName, double variantPrice) {
@@ -110,7 +245,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
     if (_isLoading) {
       return const Scaffold(
         body: Center(
-          child: CircularProgressIndicator(),
+          child: CircularProgressIndicator(
+            color: AppColors.primaryColor,
+          ),
         ),
       );
     }
@@ -127,11 +264,29 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error!),
+              const Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.red,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.red,
+                ),
+              ),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: _loadProduct,
-                child: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -236,7 +391,15 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
 
           // Share button
           GestureDetector(
-            onTap: () {/* Handle share */},
+            onTap: () {
+              // TODO: Implement share functionality
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Share feature coming soon!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -288,6 +451,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
                         value: loadingProgress.expectedTotalBytes != null
                             ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
                             : null,
+                        color: AppColors.primaryColor,
                       ),
                     );
                   },
@@ -307,13 +471,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
           ),
         ),
 
-        // Favorite button
+        // Enhanced Favorite button with wishlist functionality
         Positioned(
           top: 20,
           right: 20,
           child: GestureDetector(
-            onTap: () => setState(() => _isFavorite = !_isFavorite),
-            child: Container(
+            onTap: _toggleWishlist,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -326,10 +491,23 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
                   ),
                 ],
               ),
-              child: Icon(
-                _isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: _isFavorite ? AppColors.primaryColor : Colors.grey[400],
-                size: 24,
+              child: _isWishlistLoading
+                  ? SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primaryColor,
+                ),
+              )
+                  : AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Icon(
+                  _isFavorite ? Icons.favorite : Icons.favorite_border,
+                  key: ValueKey(_isFavorite),
+                  color: _isFavorite ? AppColors.primaryColor : Colors.grey[400],
+                  size: 24,
+                ),
               ),
             ),
           ),
@@ -408,12 +586,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
               Row(
                 children: List.generate(
                   5,
-                  (index) => Icon(
+                      (index) => Icon(
                     index < _product!.rating.floor()
                         ? Icons.star
                         : (index < _product!.rating && index >= _product!.rating.floor()
-                            ? Icons.star_half
-                            : Icons.star_border),
+                        ? Icons.star_half
+                        : Icons.star_border),
                     color: const Color(0xFFFFA000),
                     size: 20,
                   ),
@@ -438,9 +616,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
             builder: (context) {
               if (_product!.variants != null && _product!.variants is Map<String, dynamic>) {
                 final variants = _product!.variants as Map<String, dynamic>;
-                if (variants.containsKey('name') && 
-                    variants.containsKey('price') && 
-                    variants['name'] is List && 
+                if (variants.containsKey('name') &&
+                    variants.containsKey('price') &&
+                    variants['name'] is List &&
                     variants['price'] is List &&
                     (variants['name'] as List).isNotEmpty) {
                   return Column(
@@ -464,7 +642,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
                           itemBuilder: (context, index) {
                             final variantName = (variants['name'] as List)[index].toString();
                             final variantPrice = double.tryParse((variants['price'] as List)[index].toString()) ?? 0.0;
-                            
+
                             return Padding(
                               padding: EdgeInsets.only(right: index == (variants['name'] as List).length - 1 ? 0 : 12),
                               child: GestureDetector(
@@ -507,7 +685,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
                   );
                 }
               }
-              return const SizedBox.shrink(); // Return empty widget if no variants
+              return const SizedBox.shrink();
             },
           ),
 
@@ -731,6 +909,36 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
       ),
       child: Row(
         children: [
+          // Wishlist button
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: _isFavorite ? AppColors.primaryColor : Colors.grey[300]!,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              color: _isFavorite ? AppColors.primaryColor.withOpacity(0.1) : Colors.white,
+            ),
+            child: IconButton(
+              icon: _isWishlistLoading
+                  ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primaryColor,
+                ),
+              )
+                  : Icon(
+                _isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: _isFavorite ? AppColors.primaryColor : Colors.grey[600],
+              ),
+              onPressed: _toggleWishlist,
+            ),
+          ),
+          const SizedBox(width: 12),
+
           // Chat button
           Container(
             width: 50,
@@ -741,7 +949,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
             ),
             child: IconButton(
               icon: const Icon(
-              Icons.chat_outlined,
+                Icons.chat_outlined,
                 color: AppColors.primaryColor,
               ),
               onPressed: () {
@@ -749,70 +957,80 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Chat feature coming soon!'),
+                    duration: Duration(seconds: 2),
                   ),
                 );
               },
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
+
           // Add to cart button
           Expanded(
-                    child: ElevatedButton(
+            child: ElevatedButton(
               onPressed: _product!.stock > 0 &&
-                        (_product!.variants == null ||
-                         !(_product!.variants is Map) ||
-                         _selectedVariant != null)
+                  (_product!.variants == null ||
+                      !(_product!.variants is Map) ||
+                      _selectedVariant != null)
                   ? () async {
-                      try {
-                        await CartService.addToCart(
-                          productId: _product!.id,
-                          quantity: _quantity,
-                          variant: _selectedVariant,
-                        );
-                        
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Added to cart!'),
-                              backgroundColor: AppColors.success,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to add to cart: ${e.toString()}'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                    }
-                  : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryColor,
-                        foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                elevation: 0,
+                if (!AuthService.isAuthenticated) {
+                  _showLoginDialog();
+                  return;
+                }
+
+                try {
+                  await CartService.addToCart(
+                    productId: _product!.id,
+                    quantity: _quantity,
+                    variant: _selectedVariant,
+                  );
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Added to cart!'),
+                        backgroundColor: AppColors.success,
+                        duration: Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
                       ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to add to cart: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                }
+              }
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
               child: Text(
                 _product!.stock > 0
                     ? (_product!.variants != null &&
-                       _product!.variants is Map &&
-                       _selectedVariant == null)
-                        ? 'Select a variant'
-                        : 'Add to Cart - Rp${_formatPrice(_currentPrice * _quantity)}'
+                    _product!.variants is Map &&
+                    _selectedVariant == null)
+                    ? 'Select a variant'
+                    : 'Add to Cart - Rp${_formatPrice(_currentPrice * _quantity)}'
                     : 'Out of Stock',
                 style: const TextStyle(
-                          fontFamily: 'SF Pro Display',
+                  fontFamily: 'SF Pro Display',
                   fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],

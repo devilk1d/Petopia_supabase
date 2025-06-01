@@ -20,17 +20,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<Map<String, dynamic>> _storeProfiles = [];
   Map<String, dynamic>? _currentUser;
   StreamSubscription? _userSubscription;
+  StreamSubscription? _storeSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadProfiles();
     _subscribeToUserProfile();
+    _subscribeToUserStores();
   }
 
   @override
   void dispose() {
     _userSubscription?.cancel();
+    _storeSubscription?.cancel();
     super.dispose();
   }
 
@@ -54,6 +57,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _subscribeToUserStores() {
+    try {
+      _storeSubscription = UserService.subscribeToUserStores().listen(
+        (stores) {
+          if (mounted) {
+            setState(() {
+              _storeProfiles = stores;
+            });
+          }
+        },
+        onError: (error) {
+          print('Error in store subscription: $error');
+        },
+      );
+    } catch (e) {
+      print('Error setting up store subscription: $e');
+    }
+  }
+
   Future<void> _loadProfiles() async {
     if (!mounted) return;
 
@@ -64,12 +86,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       // Get current user first
       final currentUser = await UserService.getCurrentUserProfile();
-      final storeProfiles = await UserService.getUserStores();
 
       if (mounted) {
         setState(() {
           _currentUser = currentUser;
-          _storeProfiles = storeProfiles;
           _isLoading = false;
         });
       }
@@ -403,28 +423,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           isStore: true,
                         )
                       else
-                        Row(
-                          children: [
-                            _buildStoreCard(
-                              _storeProfiles.first['store_image_url'] ?? '',
-                              _storeProfiles.first['store_name'] ?? 'Unnamed Store',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const StoreManagementScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 16),
-                            _buildAddCard(
-                              title: 'Add Store',
-                              icon: Icons.add_business_rounded,
-                              onTap: () => Navigator.pushNamed(context, '/register-toko'),
-                              isStore: true,
-                            ),
-                          ],
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              ..._storeProfiles.map((store) => Padding(
+                                padding: const EdgeInsets.only(right: 16),
+                                child: _buildStoreCard(
+                                  store['store_image_url'] ?? '',
+                                  store['store_name'] ?? 'Unnamed Store',
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => StoreManagementScreen(storeId: store['id']),
+                                      ),
+                                    );
+                                  },
+                                  storeId: store['id'],
+                                ),
+                              )),
+                              _buildAddCard(
+                                title: 'Add Store',
+                                icon: Icons.add_business_rounded,
+                                onTap: () => Navigator.pushNamed(context, '/register-toko'),
+                                isStore: true,
+                              ),
+                            ],
+                          ),
                         ),
                     ],
                   ),
@@ -540,6 +566,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildStoreCard(String imageUrl, String name, {
     required VoidCallback onTap,
     IconData? icon,
+    String? storeId,
   }) {
     return Container(
       width: 120,
