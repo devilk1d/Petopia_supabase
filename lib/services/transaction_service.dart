@@ -71,10 +71,10 @@ class TransactionService {
         }
 
         // Parse date safely
-        DateTime orderDate = DateTime.now();
+        String orderDateStr = '';
         try {
           if (order['created_at'] != null) {
-            orderDate = DateTime.parse(order['created_at'].toString()).toLocal();
+            orderDateStr = order['created_at'].toString();
           }
         } catch (e) {
           print('Error parsing date: $e');
@@ -111,7 +111,8 @@ class TransactionService {
           'productImage': productImage,
           'quantity': '${orderItems.length} barang',
           'price': price,
-          'date': orderDate,
+          'date': orderDateStr,
+          'created_at': orderDateStr,
           'status': _mapOrderStatus(order['status']?.toString(), order['payment_status']?.toString()),
           'totalAmount': totalAmount,
           'paymentMethod': paymentMethod['name']?.toString() ?? 'Unknown',
@@ -217,10 +218,10 @@ class TransactionService {
         }
 
         // Parse date safely
-        DateTime orderDate = DateTime.now();
+        String orderDateStr = '';
         try {
           if (order['created_at'] != null) {
-            orderDate = DateTime.parse(order['created_at'].toString()).toLocal();
+            orderDateStr = order['created_at'].toString();
           }
         } catch (e) {
           print('Error parsing date: $e');
@@ -257,7 +258,8 @@ class TransactionService {
           'productImage': productImage,
           'quantity': '${orderItems.length} barang',
           'price': price,
-          'date': orderDate,
+          'date': orderDateStr,
+          'created_at': orderDateStr,
           'status': _mapOrderStatus(order['status']?.toString(), order['payment_status']?.toString()),
           'totalAmount': totalAmount,
           'paymentMethod': paymentMethod['name']?.toString() ?? 'Unknown',
@@ -335,10 +337,10 @@ class TransactionService {
         }
 
         // Parse date safely
-        DateTime orderDate = DateTime.now();
+        String orderDateStr = '';
         try {
           if (order['created_at'] != null) {
-            orderDate = DateTime.parse(order['created_at'].toString()).toLocal();
+            orderDateStr = order['created_at'].toString();
           }
         } catch (e) {
           print('Error parsing date: $e');
@@ -375,7 +377,8 @@ class TransactionService {
           'productImage': productImage,
           'quantity': '${orderItems.length} barang',
           'price': price,
-          'date': orderDate,
+          'date': orderDateStr,
+          'created_at': orderDateStr,
           'status': _mapOrderStatus(order['status']?.toString(), order['payment_status']?.toString()),
           'totalAmount': totalAmount,
           'paymentMethod': paymentMethod['name']?.toString() ?? 'Unknown',

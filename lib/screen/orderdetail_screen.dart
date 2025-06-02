@@ -4,6 +4,7 @@ import '../utils/colors.dart';
 import '../services/order_service.dart';
 import '../services/auth_service.dart';
 import 'dart:convert';
+import '../utils/datetime_utils.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   const OrderDetailScreen({Key? key}) : super(key: key);
@@ -578,8 +579,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     String formattedDate = 'N/A';
     if (createdAt != null) {
       try {
-        final date = DateTime.parse(createdAt.toString()).toLocal();
-        formattedDate = _formatDate(date);
+        formattedDate = DateTimeUtils.formatIndonesianDateTime(createdAt);
       } catch (e) {
         formattedDate = 'Format tanggal tidak valid';
       }
@@ -1615,21 +1615,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           return Icons.help_outline;
       }
     }
-  }
-
-  String _formatDate(DateTime date) {
-    const List<String> monthNames = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-    ];
-
-    final day = date.day.toString();
-    final month = monthNames[date.month - 1];
-    final year = date.year.toString();
-    final hour = date.hour.toString().padLeft(2, '0');
-    final minute = date.minute.toString().padLeft(2, '0');
-
-    return '$day $month $year, $hour:$minute WIB';
   }
 
   String _formatPrice(double price) {

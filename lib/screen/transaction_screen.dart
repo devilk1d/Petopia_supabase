@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/colors.dart';
 import '../services/transaction_service.dart';
 import '../services/auth_service.dart';
+import '../utils/datetime_utils.dart';
 
 class TransactionScreen extends StatefulWidget {
   const TransactionScreen({Key? key}) : super(key: key);
@@ -314,10 +315,14 @@ class _TransactionScreenState extends State<TransactionScreen> {
     final String status = transaction['status']?.toString() ?? 'UNKNOWN';
 
     // Safe date handling
-    DateTime date = DateTime.now();
+    String formattedDate = '-';
     final dateValue = transaction['date'];
-    if (dateValue is DateTime) {
-      date = dateValue;
+    if (transaction.containsKey('created_at')) {
+      formattedDate = DateTimeUtils.formatIndonesianDateTime(transaction['created_at']);
+    } else if (dateValue is DateTime) {
+      formattedDate = DateTimeUtils.formatIndonesianDateTime(dateValue);
+    } else if (dateValue is String) {
+      formattedDate = DateTimeUtils.formatIndonesianDateTime(dateValue);
     }
 
     // Safe double conversion
@@ -330,8 +335,6 @@ class _TransactionScreenState extends State<TransactionScreen> {
     } else if (totalValue is String) {
       totalAmount = double.tryParse(totalValue) ?? 0.0;
     }
-
-    String formattedDate = _formatDate(date);
 
     Color statusColor;
     String statusText;
@@ -651,20 +654,6 @@ class _TransactionScreenState extends State<TransactionScreen> {
         ],
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    // Indonesian month names
-    const List<String> monthNames = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-    ];
-
-    final day = date.day.toString().padLeft(2, '0');
-    final month = monthNames[date.month - 1];
-    final year = date.year.toString();
-
-    return '$day $month $year';
   }
 
   String _formatPrice(double price) {
