@@ -38,11 +38,12 @@ class PromoService {
   // Get all active promos
   static Future<List<PromoModel>> getActivePromos() async {
     try {
+      final nowIso = DateTime.now().toIso8601String();
       final response = await _client
           .from('promos')
           .select()
           .eq('is_active', true)
-          .gte('end_date', DateTime.now().toIso8601String())
+          .or('end_date.gte.$nowIso,end_date.is.null')
           .order('created_at', ascending: false);
 
       if (response == null || (response as List).isEmpty) {

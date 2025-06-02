@@ -397,7 +397,19 @@ class OrderService {
           .select('''
             *,
             orders!inner(*),
-            products(*)
+            products!inner(
+              id,
+              name,
+              price,
+              images,
+              description,
+              seller_id,
+              sellers!inner(
+                id,
+                store_name,
+                store_image_url
+              )
+            )
           ''')
           .eq('seller_id', sellerId)
           .order('created_at', ascending: false);
@@ -413,7 +425,18 @@ class OrderService {
             'order_items': [],
           };
         }
-        ordersMap[orderId]!['order_items'].add(item);
+        
+        // Process the product data
+        final product = item['products'];
+        final seller = product['sellers'];
+        
+        ordersMap[orderId]!['order_items'].add({
+          ...item,
+          'product_name': product['name'],
+          'product_image': (product['images'] as List).isNotEmpty ? product['images'][0] : null,
+          'store_name': seller['store_name'],
+          'store_image': seller['store_image_url'],
+        });
       }
 
       return ordersMap.values

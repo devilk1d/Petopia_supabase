@@ -78,13 +78,12 @@ class _PromoFormState extends State<PromoForm> {
           content: Text(
             message,
             style: const TextStyle(
-              fontFamily: 'SF Pro Display',
               fontWeight: FontWeight.w500,
             ),
           ),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          backgroundColor: const Color(0xFF2D3748),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: AppColors.primaryColor,
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -148,7 +147,7 @@ class _PromoFormState extends State<PromoForm> {
         Navigator.pop(context);
       }
     } catch (e) {
-      _showSnackBar('Error saving promo: $e');
+      _showSnackBar('Error menyimpan promo: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -167,7 +166,7 @@ class _PromoFormState extends State<PromoForm> {
               primary: AppColors.primaryColor,
               onPrimary: Colors.white,
               surface: Colors.white,
-              onSurface: const Color(0xFF1E293B),
+              onSurface: Colors.black,
             ),
           ),
           child: child!,
@@ -191,107 +190,12 @@ class _PromoFormState extends State<PromoForm> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      extendBody: true,
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.arrow_back,
-              color: Color(0xFF1E293B),
-              size: 20,
-            ),
-          ),
-          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
-        ),
-        systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-        ),
-      ),
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: _buildModernAppBar(),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header Section with full screen background
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 80,
-                left: 24,
-                right: 24,
-                bottom: 32,
-              ),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFFF8FAFC),
-                    Colors.white,
-                  ],
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.local_offer_outlined,
-                      color: AppColors.primaryColor,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.promo == null ? 'Add Promo' : 'Edit Promo',
-                          style: const TextStyle(
-                            fontFamily: 'SF Pro Display',
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1E293B),
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.promo == null ? 'Create a new promotional offer' : 'Update promo details',
-                          style: TextStyle(
-                            fontFamily: 'SF Pro Display',
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
+            _buildHeaderSection(),
             // Form Content
             Padding(
               padding: const EdgeInsets.all(20),
@@ -328,16 +232,90 @@ class _PromoFormState extends State<PromoForm> {
     );
   }
 
+  PreferredSizeWidget _buildModernAppBar() {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      leading: Container(
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8F9FA),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 18),
+          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+        ),
+      ),
+      title: Text(
+        widget.promo == null ? 'Tambah Promo' : 'Edit Promo',
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      centerTitle: true,
+    );
+  }
+
+  Widget _buildHeaderSection() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              Icons.local_offer_outlined,
+              color: AppColors.primaryColor,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.promo == null ? 'Tambah Promo' : 'Edit Promo',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.promo == null ? 'Buat penawaran promosi baru' : 'Perbarui detail promo',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBasicInfoCard() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
@@ -349,15 +327,21 @@ class _PromoFormState extends State<PromoForm> {
           children: [
             Row(
               children: [
-                Icon(Icons.info_outlined, size: 20, color: AppColors.primaryColor),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.info_outlined, size: 20, color: AppColors.primaryColor),
+                ),
                 const SizedBox(width: 12),
                 const Text(
-                  'Basic Information',
+                  'Informasi Dasar',
                   style: TextStyle(
-                    fontFamily: 'SF Pro Display',
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B),
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
                   ),
                 ),
               ],
@@ -365,24 +349,24 @@ class _PromoFormState extends State<PromoForm> {
             const SizedBox(height: 20),
             _buildTextField(
               controller: _codeController,
-              label: 'Promo Code',
+              label: 'Kode Promo',
               icon: Icons.local_offer_outlined,
-              validator: (value) => value?.isEmpty ?? true ? 'Please enter promo code' : null,
+              validator: (value) => value?.isEmpty ?? true ? 'Mohon masukkan kode promo' : null,
             ),
             const SizedBox(height: 16),
             _buildTextField(
               controller: _titleController,
-              label: 'Title',
+              label: 'Judul',
               icon: Icons.title_outlined,
-              validator: (value) => value?.isEmpty ?? true ? 'Please enter title' : null,
+              validator: (value) => value?.isEmpty ?? true ? 'Mohon masukkan judul' : null,
             ),
             const SizedBox(height: 16),
             _buildTextField(
               controller: _descriptionController,
-              label: 'Description',
+              label: 'Deskripsi',
               icon: Icons.description_outlined,
               maxLines: 3,
-              validator: (value) => value?.isEmpty ?? true ? 'Please enter description' : null,
+              validator: (value) => value?.isEmpty ?? true ? 'Mohon masukkan deskripsi' : null,
             ),
           ],
         ),
@@ -394,12 +378,11 @@ class _PromoFormState extends State<PromoForm> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
@@ -411,15 +394,21 @@ class _PromoFormState extends State<PromoForm> {
           children: [
             Row(
               children: [
-                Icon(Icons.discount_outlined, size: 20, color: AppColors.primaryColor),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.discount_outlined, size: 20, color: AppColors.primaryColor),
+                ),
                 const SizedBox(width: 12),
                 const Text(
-                  'Discount Details',
+                  'Detail Diskon',
                   style: TextStyle(
-                    fontFamily: 'SF Pro Display',
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B),
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
                   ),
                 ),
               ],
@@ -429,16 +418,16 @@ class _PromoFormState extends State<PromoForm> {
             const SizedBox(height: 16),
             _buildTextField(
               controller: _discountValueController,
-              label: 'Discount Value',
+              label: 'Nilai Diskon',
               icon: Icons.money_outlined,
               suffixText: _discountType == 'percentage' ? '%' : 'Rp',
               keyboardType: TextInputType.number,
               validator: (value) {
-                if (value == null || value.isEmpty) return 'Please enter discount value';
+                if (value == null || value.isEmpty) return 'Mohon masukkan nilai diskon';
                 String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-                if (digits.isEmpty) return 'Please enter a valid number';
+                if (digits.isEmpty) return 'Mohon masukkan angka yang valid';
                 if (_discountType == 'percentage' && double.parse(digits) > 100) {
-                  return 'Percentage cannot be more than 100';
+                  return 'Persentase tidak boleh lebih dari 100';
                 }
                 return null;
               },
@@ -454,12 +443,11 @@ class _PromoFormState extends State<PromoForm> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
@@ -471,15 +459,21 @@ class _PromoFormState extends State<PromoForm> {
           children: [
             Row(
               children: [
-                Icon(Icons.tune_outlined, size: 20, color: AppColors.primaryColor),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.tune_outlined, size: 20, color: AppColors.primaryColor),
+                ),
                 const SizedBox(width: 12),
                 const Text(
-                  'Conditions (Optional)',
+                  'Syarat & Ketentuan (Opsional)',
                   style: TextStyle(
-                    fontFamily: 'SF Pro Display',
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B),
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
                   ),
                 ),
               ],
@@ -487,14 +481,14 @@ class _PromoFormState extends State<PromoForm> {
             const SizedBox(height: 20),
             _buildTextField(
               controller: _minPurchaseController,
-              label: 'Minimum Purchase (optional)',
+              label: 'Pembelian Minimum (opsional)',
               icon: Icons.shopping_cart_outlined,
               prefixText: 'Rp ',
               keyboardType: TextInputType.number,
               validator: (value) {
                 if (value != null && value.isNotEmpty) {
                   String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-                  if (digits.isEmpty) return 'Please enter a valid number';
+                  if (digits.isEmpty) return 'Mohon masukkan angka yang valid';
                 }
                 return null;
               },
@@ -503,14 +497,14 @@ class _PromoFormState extends State<PromoForm> {
             const SizedBox(height: 16),
             _buildTextField(
               controller: _maxDiscountController,
-              label: 'Maximum Discount (optional)',
+              label: 'Diskon Maksimum (opsional)',
               icon: Icons.money_off_outlined,
               prefixText: 'Rp ',
               keyboardType: TextInputType.number,
               validator: (value) {
                 if (value != null && value.isNotEmpty) {
                   String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-                  if (digits.isEmpty) return 'Please enter a valid number';
+                  if (digits.isEmpty) return 'Mohon masukkan angka yang valid';
                 }
                 return null;
               },
@@ -519,12 +513,12 @@ class _PromoFormState extends State<PromoForm> {
             const SizedBox(height: 16),
             _buildTextField(
               controller: _usageLimitController,
-              label: 'Usage Limit (optional)',
+              label: 'Batas Penggunaan (opsional)',
               icon: Icons.people_outlined,
               keyboardType: TextInputType.number,
               validator: (value) {
                 if (value != null && value.isNotEmpty && int.tryParse(value) == null) {
-                  return 'Please enter a valid number';
+                  return 'Mohon masukkan angka yang valid';
                 }
                 return null;
               },
@@ -539,12 +533,11 @@ class _PromoFormState extends State<PromoForm> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
@@ -556,29 +549,35 @@ class _PromoFormState extends State<PromoForm> {
           children: [
             Row(
               children: [
-                Icon(Icons.calendar_month_outlined, size: 20, color: AppColors.primaryColor),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.calendar_month_outlined, size: 20, color: AppColors.primaryColor),
+                ),
                 const SizedBox(width: 12),
                 const Text(
-                  'Validity Period',
+                  'Periode Berlaku',
                   style: TextStyle(
-                    fontFamily: 'SF Pro Display',
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B),
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
             _buildDatePicker(
-              label: 'Start Date',
+              label: 'Tanggal Mulai',
               icon: Icons.calendar_today_outlined,
               selectedDate: _startDate,
               isStartDate: true,
             ),
             const SizedBox(height: 16),
             _buildDatePicker(
-              label: 'End Date (optional)',
+              label: 'Tanggal Berakhir (opsional)',
               icon: Icons.event_outlined,
               selectedDate: _endDate,
               isStartDate: false,
@@ -607,57 +606,58 @@ class _PromoFormState extends State<PromoForm> {
         Text(
           label,
           style: const TextStyle(
-            fontFamily: 'SF Pro Display',
             fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF374151),
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         TextFormField(
           controller: controller,
-          style: const TextStyle(fontFamily: 'SF Pro Display'),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
+          ),
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: const Color(0xFF6B7280), size: 20),
+            prefixIcon: Icon(icon, color: Colors.grey.shade500, size: 20),
             prefixText: prefixText,
-            prefixStyle: const TextStyle(fontFamily: 'SF Pro Display'),
             suffixText: suffixText,
-            suffixStyle: const TextStyle(fontFamily: 'SF Pro Display'),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(color: AppColors.primaryColor, width: 2),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(16),
               borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2),
             ),
             filled: true,
-            fillColor: const Color(0xFFFAFBFC),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            fillColor: const Color(0xFFF8F9FA),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           keyboardType: keyboardType,
           maxLines: maxLines,
           validator: validator,
           onChanged: isPrice
               ? (value) {
-                  String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-                  if (digits.isEmpty) {
-                    controller.text = '';
-                  } else {
-                    controller.text = formatRupiah(int.parse(digits));
-                  }
-                  controller.selection = TextSelection.fromPosition(
-                    TextPosition(offset: controller.text.length),
-                  );
-                }
+            String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+            if (digits.isEmpty) {
+              controller.text = '';
+            } else {
+              controller.text = formatRupiah(int.parse(digits));
+            }
+            controller.selection = TextSelection.fromPosition(
+              TextPosition(offset: controller.text.length),
+            );
+          }
               : null,
         ),
       ],
@@ -669,54 +669,48 @@ class _PromoFormState extends State<PromoForm> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Discount Type',
+          'Jenis Diskon',
           style: TextStyle(
-            fontFamily: 'SF Pro Display',
             fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF374151),
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: _discountType,
           style: const TextStyle(
-            fontFamily: 'SF Pro Display',
-            color: Color(0xFF1E293B),
+            color: Colors.black,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
           ),
           decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.discount_outlined,
-                color: Color(0xFF6B7280), size: 20),
+            prefixIcon: Icon(Icons.discount_outlined,
+                color: Colors.grey.shade500, size: 20),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(color: AppColors.primaryColor, width: 2),
             ),
             filled: true,
-            fillColor: const Color(0xFFFAFBFC),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            fillColor: const Color(0xFFF8F9FA),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
-          items: [
+          items: const [
             DropdownMenuItem(
               value: 'percentage',
-              child: Text(
-                'Percentage',
-                style: const TextStyle(fontFamily: 'SF Pro Display'),
-              ),
+              child: Text('Persentase'),
             ),
             DropdownMenuItem(
               value: 'fixed',
-              child: Text(
-                'Fixed Amount',
-                style: const TextStyle(fontFamily: 'SF Pro Display'),
-              ),
+              child: Text('Jumlah Tetap'),
             ),
           ],
           onChanged: _isSubmitting
@@ -744,44 +738,42 @@ class _PromoFormState extends State<PromoForm> {
         Text(
           label,
           style: const TextStyle(
-            fontFamily: 'SF Pro Display',
             fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF374151),
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         InkWell(
           onTap: _isSubmitting ? null : () => _selectDate(context, isStartDate),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(16),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFFFAFBFC),
-              border: Border.all(color: const Color(0xFFD1D5DB)),
-              borderRadius: BorderRadius.circular(8),
+              color: const Color(0xFFF8F9FA),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               children: [
-                Icon(icon, color: const Color(0xFF6B7280), size: 20),
+                Icon(icon, color: Colors.grey.shade500, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     selectedDate == null
-                        ? (isOptional ? 'Select Date (optional)' : 'Select Date')
+                        ? (isOptional ? 'Pilih Tanggal (opsional)' : 'Pilih Tanggal')
                         : '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                     style: TextStyle(
-                      fontFamily: 'SF Pro Display',
-                      fontSize: 16,
+                      fontSize: 14,
                       color: selectedDate == null
-                          ? const Color(0xFF9CA3AF)
-                          : const Color(0xFF1E293B),
+                          ? Colors.grey.shade500
+                          : Colors.black,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                const Icon(Icons.arrow_drop_down, color: Color(0xFF6B7280)),
+                Icon(Icons.arrow_drop_down, color: Colors.grey.shade500),
               ],
             ),
           ),
@@ -791,18 +783,32 @@ class _PromoFormState extends State<PromoForm> {
   }
 
   Widget _buildSaveButton() {
-    return SizedBox(
+    return Container(
       width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [AppColors.primaryColor, AppColors.primaryDark],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryColor.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: ElevatedButton(
         onPressed: _isSubmitting ? null : _submitForm,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryColor,
-          foregroundColor: Colors.white,
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(16),
           ),
-          elevation: 0,
         ),
         child: _isSubmitting
             ? const SizedBox(
@@ -814,11 +820,11 @@ class _PromoFormState extends State<PromoForm> {
           ),
         )
             : const Text(
-          'Save Promo',
+          'Simpan Promo',
           style: TextStyle(
-            fontFamily: 'SF Pro Display',
             fontSize: 16,
             fontWeight: FontWeight.w600,
+            color: Colors.white,
           ),
         ),
       ),

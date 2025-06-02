@@ -45,6 +45,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   StreamSubscription? _promosSubscription;
   StreamSubscription? _wishlistSubscription;
 
+  // Banner auto-scroll timer
+  Timer? _bannerTimer;
+
   // Check if user is logged in
   bool get _isLoggedIn => AuthService.getCurrentUserId() != null;
 
@@ -82,6 +85,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void dispose() {
     _bannerController.dispose();
     _animationController.dispose();
+    _bannerTimer?.cancel(); // Cancel timer saat dispose
 
     // Cancel all subscriptions
     _userSubscription?.cancel();
@@ -259,15 +263,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   void _handlePromosUpdate(List<Map<String, dynamic>> data) {
     try {
-      print('Promos updated via real-time: ${data.length} items');
-
-      final updatedPromos = data
-          .map((json) => PromoModel.fromJson(json))
-          .toList();
-
+      print('Promos updated via real-time: [38;5;2m${data.length} items[0m');
+      final updatedPromos = data.map((json) => PromoModel.fromJson(json)).toList();
       setState(() {
         _promos = updatedPromos;
       });
+      if (_promos.isNotEmpty) {
+        _autoScrollBanner();
+      } else {
+        _bannerTimer?.cancel();
+      }
     } catch (e) {
       print('Error handling promos update: $e');
     }
@@ -351,6 +356,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         setState(() {
           _promos = promos;
         });
+        if (_promos.isNotEmpty) {
+          _autoScrollBanner();
+        } else {
+          _bannerTimer?.cancel();
+        }
       }
       print('Promos loaded: ${promos.length} items');
     } catch (e) {
@@ -481,16 +491,19 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   void _autoScrollBanner() {
+    _bannerTimer?.cancel(); // Cancel timer lama jika ada
     if (!mounted || _promos.isEmpty) return;
-
-    Future.delayed(const Duration(seconds: 4), () {
-      if (mounted && _promos.isNotEmpty) {
+    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (!mounted || _promos.isEmpty) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
         if (_currentBannerIndex < _promos.length - 1) {
           _currentBannerIndex++;
         } else {
           _currentBannerIndex = 0;
         }
-
         if (_bannerController.hasClients) {
           _bannerController.animateToPage(
             _currentBannerIndex,
@@ -498,9 +511,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             curve: Curves.easeInOut,
           );
         }
-
-        _autoScrollBanner();
-      }
+      });
     });
   }
 
@@ -624,7 +635,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               style: TextStyle(
                                 fontFamily: 'SF Pro Display',
                                 fontSize: 20,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ],
@@ -783,6 +794,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     ? AppColors.greenBanner
                                     : AppColors.redBanner,
                                 imagePath: 'assets/images/banners/promo_${index % 4 + 1}.png',
+                                minPurchase: promo.minPurchase,
+                                startDate: promo.startDate,
+                                endDate: promo.endDate,
                               );
                             },
                           ),

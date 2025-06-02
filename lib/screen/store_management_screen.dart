@@ -29,6 +29,9 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
   List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
 
+  // Add this variable to track expanded orders
+  Map<String, bool> _expandedOrders = {};
+
   // Form controllers
   final _formKey = GlobalKey<FormState>();
   final _storeNameController = TextEditingController();
@@ -94,8 +97,8 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
           'price': item.price,
           'variant': item.variant,
           'products': {
-            'name': item.productName,
-            'images': [item.productImage],
+            'name': item.productName ?? 'Unknown Product',
+            'images': item.productImage != null ? [item.productImage] : [],
           },
         }).toList(),
       }).toList();
@@ -124,8 +127,8 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         SnackBar(
           content: Text(message),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          backgroundColor: const Color(0xFF2D3748),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: AppColors.primaryColor,
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -136,13 +139,13 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Color(0xFFF8FAFC),
+        backgroundColor: Color(0xFFF8F9FA),
         body: Center(child: LoadingIndicator()),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F9FA),
       body: CustomScrollView(
         slivers: [
           // Modern App Bar
@@ -152,7 +155,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
             pinned: true,
             elevation: 0,
             backgroundColor: Colors.white,
-            foregroundColor: const Color(0xFF1E293B),
+            foregroundColor: Colors.black,
             surfaceTintColor: Colors.transparent,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
@@ -161,7 +164,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Color(0xFFF8FAFC),
+                      Color(0xFFF8F9FA),
                       Colors.white,
                     ],
                   ),
@@ -183,11 +186,11 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _storeData?['store_name'] ?? 'My Store',
+                                    _storeData?['store_name'] ?? 'Toko Saya',
                                     style: const TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.w700,
-                                      color: Color(0xFF1E293B),
+                                      color: Colors.black,
                                       letterSpacing: -0.5,
                                     ),
                                   ),
@@ -258,6 +261,101 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
     );
   }
 
+  // Hapus method _buildModernAppBar() dan _buildModernTabBar() karena tidak digunakan lagi
+  // Hapus juga method _buildStoreInfoCard() karena info sudah ada di header
+
+  Widget _buildModernFAB() {
+    if (_tabController.index == 0 || _tabController.index == 3) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.primaryColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryColor.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: FloatingActionButton(
+        onPressed: () {
+          if (_tabController.index == 1) {
+            _showAddProductDialog();
+          } else {
+            _showAddPromoDialog();
+          }
+        },
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: const Icon(Icons.add, color: Colors.white, size: 28),
+      ),
+    );
+  }
+
+  Widget _buildModernStoreProfileTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          _buildModernStatsCards(),
+          const SizedBox(height: 20),
+          _buildModernProfileForm(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStoreInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _buildModernStoreAvatar(),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _storeData?['store_name'] ?? 'Toko Saya',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Kelola toko Anda',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildModernStoreAvatar() {
     return Container(
       width: 64,
@@ -279,55 +377,22 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
     );
   }
 
-  Widget _buildModernFAB() {
-    if (_tabController.index == 0 || _tabController.index == 3) {
-      return const SizedBox.shrink();
-    }
-
-    return FloatingActionButton(
-      onPressed: () {
-        if (_tabController.index == 1) {
-          _showAddProductDialog();
-        } else {
-          _showAddPromoDialog();
-        }
-      },
-      backgroundColor: AppColors.primaryColor,
-      elevation: 0,
-      shape: const CircleBorder(),
-      child: const Icon(Icons.add, color: Colors.white, size: 24),
-    );
-  }
-
-  Widget _buildModernStoreProfileTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          _buildModernStatsCards(),
-          const SizedBox(height: 20),
-          _buildModernProfileForm(),
-        ],
-      ),
-    );
-  }
-
   Widget _buildModernStatsCards() {
     return Row(
       children: [
         Expanded(
           child: _buildModernStatCard(
             icon: Icons.inventory_2_outlined,
-            label: 'Products',
+            label: 'Produk',
             value: _products.length.toString(),
-            color: const Color(0xFF3B82F6),
+            color: AppColors.primaryColor,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _buildModernStatCard(
             icon: Icons.local_offer_outlined,
-            label: 'Promos',
+            label: 'Promo',
             value: _promos.length.toString(),
             color: const Color(0xFF10B981),
           ),
@@ -336,7 +401,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         Expanded(
           child: _buildModernStatCard(
             icon: Icons.shopping_bag_outlined,
-            label: 'Orders',
+            label: 'Pesanan',
             value: _orders.length.toString(),
             color: const Color(0xFFF59E0B),
           ),
@@ -355,26 +420,32 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         children: [
-          Icon(icon, size: 24, color: color),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
           const SizedBox(height: 8),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1E293B),
+              color: Colors.black,
             ),
           ),
           const SizedBox(height: 2),
@@ -396,12 +467,11 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
@@ -412,23 +482,23 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Store Information',
+              'Informasi Toko',
               style: TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1E293B),
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
               ),
             ),
             const SizedBox(height: 20),
             _buildModernImageUpload(),
             const SizedBox(height: 20),
-            _buildModernTextField(_storeNameController, 'Store Name', Icons.store_outlined),
+            _buildModernTextField(_storeNameController, 'Nama Toko', Icons.store_outlined),
             const SizedBox(height: 16),
-            _buildModernTextField(_descriptionController, 'Description', Icons.description_outlined, maxLines: 3),
+            _buildModernTextField(_descriptionController, 'Deskripsi', Icons.description_outlined, maxLines: 3),
             const SizedBox(height: 16),
-            _buildModernTextField(_phoneController, 'Phone', Icons.phone_outlined),
+            _buildModernTextField(_phoneController, 'Nomor Telepon', Icons.phone_outlined),
             const SizedBox(height: 16),
-            _buildModernTextField(_addressController, 'Address', Icons.location_on_outlined, maxLines: 2),
+            _buildModernTextField(_addressController, 'Alamat', Icons.location_on_outlined, maxLines: 2),
             const SizedBox(height: 24),
             _buildModernSaveButton(),
           ],
@@ -445,9 +515,9 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
           width: 100,
           height: 100,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: const Color(0xFFF8FAFC),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 2),
+            borderRadius: BorderRadius.circular(20),
+            color: const Color(0xFFF8F9FA),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
             image: _storeData?['store_image_url'] != null
                 ? DecorationImage(
               image: NetworkImage(_storeData!['store_image_url']),
@@ -462,7 +532,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
               Icon(Icons.camera_alt_outlined, size: 24, color: Colors.grey.shade500),
               const SizedBox(height: 4),
               Text(
-                'Upload',
+                'Unggah',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey.shade600,
@@ -473,7 +543,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
           )
               : Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(20),
               color: Colors.black.withOpacity(0.4),
             ),
             child: const Center(
@@ -493,62 +563,77 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
           label,
           style: const TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF374151),
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         TextFormField(
           controller: controller,
           maxLines: maxLines,
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: Color(0xFF1E293B),
+            color: Colors.black,
           ),
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: const Color(0xFF6B7280), size: 20),
+            prefixIcon: Icon(icon, color: Colors.grey.shade500, size: 20),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(color: AppColors.primaryColor, width: 2),
             ),
             filled: true,
-            fillColor: const Color(0xFFFAFBFC),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            fillColor: const Color(0xFFF8F9FA),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
-          validator: (value) => value?.isEmpty ?? true ? '$label is required' : null,
+          validator: (value) => value?.isEmpty ?? true ? '$label harus diisi' : null,
         ),
       ],
     );
   }
 
   Widget _buildModernSaveButton() {
-    return SizedBox(
+    return Container(
       width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [AppColors.primaryColor, AppColors.primaryDark],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryColor.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: ElevatedButton(
         onPressed: _updateStoreProfile,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryColor,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(16),
           ),
-          elevation: 0,
         ),
         child: const Text(
-          'Save Changes',
+          'Simpan Perubahan',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
+            color: Colors.white,
           ),
         ),
       ),
@@ -557,7 +642,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
 
   Widget _buildModernProductsTab() {
     return _products.isEmpty
-        ? _buildModernEmptyState('No products yet', 'Add your first product to get started!', Icons.inventory_2_outlined)
+        ? _buildModernEmptyState('Belum ada produk', 'Tambahkan produk pertama Anda!', Icons.inventory_2_outlined)
         : ListView.builder(
       padding: const EdgeInsets.all(20),
       itemCount: _products.length,
@@ -567,7 +652,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
 
   Widget _buildModernPromosTab() {
     return _promos.isEmpty
-        ? _buildModernEmptyState('No promos yet', 'Create your first promotional offer!', Icons.local_offer_outlined)
+        ? _buildModernEmptyState('Belum ada promo', 'Buat penawaran promosi pertama Anda!', Icons.local_offer_outlined)
         : ListView.builder(
       padding: const EdgeInsets.all(20),
       itemCount: _promos.length,
@@ -578,8 +663,8 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
   Widget _buildModernOrdersTab() {
     if (_orders.isEmpty) {
       return _buildModernEmptyState(
-        'No Orders Yet',
-        'You haven\'t received any orders yet',
+        'Belum Ada Pesanan',
+        'Anda belum menerima pesanan apapun',
         Icons.shopping_bag_outlined,
       );
     }
@@ -592,172 +677,327 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         final orderItems = order['order_items'] as List;
         final status = order['status'] as String;
         final orderNumber = order['order_number'] as String;
+        final orderId = order['id'] as String;
         final orderDate = DateTime.parse(order['created_at'] as String);
         final formattedDate = '${orderDate.day}/${orderDate.month}/${orderDate.year}';
+        final isExpanded = _expandedOrders[orderId] ?? false;
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 4,
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Order #$orderNumber',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(status).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        _getStatusText(status),
-                        style: TextStyle(
-                          color: _getStatusColor(status),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  formattedDate,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...orderItems.map((item) {
-                  final product = item['products'];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            product['images'][0] ?? '',
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(8),
+          child: Column(
+            children: [
+              // Order Header
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _expandedOrders[orderId] = !isExpanded;
+                  });
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Pesanan #$orderNumber',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black,
+                                  ),
                                 ),
-                                child: Icon(
-                                  Icons.image_not_supported_outlined,
-                                  color: Colors.grey[400],
-                                  size: 20,
+                                const SizedBox(height: 4),
+                                Text(
+                                  formattedDate,
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
-                              );
-                            },
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Row(
                             children: [
-                              Text(
-                                product['name'] ?? 'Unknown Product',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                  color: Color(0xFF1E293B),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(status).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  _getStatusText(status),
+                                  style: TextStyle(
+                                    color: _getStatusColor(status),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Qty: ${item['quantity']}',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                isExpanded
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down,
+                                color: Colors.grey.shade600,
+                                size: 20,
                               ),
                             ],
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Order Summary
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8F9FA),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.shopping_bag_outlined,
+                              size: 16,
+                              color: AppColors.primaryColor,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${orderItems.length} item${orderItems.length > 1 ? '' : ''}',
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              isExpanded ? 'Tutup detail' : 'Lihat detail',
+                              style: TextStyle(
+                                color: AppColors.primaryColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Expandable Order Items
+              if (isExpanded) ...[
+                Container(
+                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Item Pesanan:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Order Items List
+                      ...orderItems.map((item) {
+                        final product = item['products'];
+                        final quantity = item['quantity'] as int;
+                        final price = (item['price'] as num).toDouble();
+                        final variant = item['variant'] as String?;
+                        final totalItemPrice = quantity * price;
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8F9FA),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            children: [
+                              // Product Image
+                              Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: Colors.white,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: (product['images'] as List).isNotEmpty
+                                      ? Image.network(
+                                    product['images'][0],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.image_not_supported_outlined,
+                                        color: Colors.grey,
+                                      );
+                                    },
+                                  )
+                                      : const Icon(
+                                    Icons.image_not_supported_outlined,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+
+                              // Product Details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      product['name'] ?? 'Produk Tidak Diketahui',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    if (variant != null && variant.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Varian: $variant',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Qty: $quantity',
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        Text(
+                                          ' × ${formatRupiah(price)}',
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Item Total Price
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    formatRupiah(totalItemPrice),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Total',
+                                    style: TextStyle(
+                                      color: Colors.grey[500],
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+
+                      // Action Button
+                      if (status == 'processing' || status == 'waiting_shipment') ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            gradient: LinearGradient(
+                              colors: [AppColors.primaryColor, AppColors.primaryDark],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primaryColor.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: () => _updateOrderStatus(orderId, 'shipped'),
+                            icon: const Icon(
+                              Icons.local_shipping_outlined,
+                              size: 18,
+                              color: Colors.white,
+                            ),
+                            label: const Text(
+                              'Kirimkan Barang',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
                         ),
                       ],
-                    ),
-                  );
-                }).toList(),
-                const SizedBox(height: 12),
-                if (status == 'processing' || status == 'waiting_shipment')
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => _updateOrderStatus(order['id'], 'shipped'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Kirimkan Barang',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  )
-                else if (status == 'shipped')
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => _updateOrderStatus(order['id'], 'delivered'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Terima',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
+                ),
               ],
-            ),
+            ],
           ),
         );
       },
@@ -772,19 +1012,19 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              color: const Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
-            child: Icon(icon, size: 48, color: const Color(0xFF94A3B8)),
+            child: Icon(icon, size: 48, color: Colors.grey.shade400),
           ),
           const SizedBox(height: 20),
           Text(
             title,
             style: const TextStyle(
               fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1E293B),
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
             ),
           ),
           const SizedBox(height: 8),
@@ -794,6 +1034,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -806,30 +1047,29 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
     final imageUrl = hasImage ? product['images'][0] : null;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Row(
           children: [
             Container(
               width: 60,
               height: 60,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: const Color(0xFFF8FAFC),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                borderRadius: BorderRadius.circular(16),
+                color: const Color(0xFFF8F9FA),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
                 image: imageUrl != null ? DecorationImage(
                   image: NetworkImage(imageUrl),
                   fit: BoxFit.cover,
@@ -845,19 +1085,19 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product['name'] ?? 'Unnamed Product',
+                    product['name'] ?? 'Produk Tanpa Nama',
                     style: const TextStyle(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       fontSize: 16,
-                      color: Color(0xFF1E293B),
+                      color: Colors.black,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       _buildModernChip(
-                        'Stock: ${product['stock']}',
-                        const Color(0xFF3B82F6),
+                        'Stok: ${product['stock']}',
+                        AppColors.primaryColor,
                       ),
                       const SizedBox(width: 8),
                       _buildModernChip(
@@ -869,33 +1109,19 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                 ],
               ),
             ),
-            // Direct Edit and Delete buttons
+            // Action buttons
             Row(
               children: [
-                InkWell(
-                  onTap: () => _showEditProductDialog(product),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    child: Icon(
-                      Icons.edit_outlined,
-                      size: 20,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
+                _buildActionButton(
+                  Icons.edit_outlined,
+                  Colors.grey.shade600,
+                      () => _showEditProductDialog(product),
                 ),
-                const SizedBox(width: 4),
-                InkWell(
-                  onTap: () => _showDeleteProductDialog(product['id']),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(
-                      Icons.delete_outline,
-                      size: 20,
-                      color: Color(0xFFEF4444),
-                    ),
-                  ),
+                const SizedBox(width: 8),
+                _buildActionButton(
+                  Icons.delete_outline,
+                  const Color(0xFFEF4444),
+                      () => _showDeleteProductDialog(product['id']),
                 ),
               ],
             ),
@@ -907,21 +1133,20 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
 
   Widget _buildModernPromoCard(Map<String, dynamic> promo) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Row(
           children: [
             Container(
@@ -929,7 +1154,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
               height: 60,
               decoration: BoxDecoration(
                 color: AppColors.primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
                 Icons.local_offer_outlined,
@@ -943,24 +1168,24 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    promo['title'] ?? 'Unnamed Promo',
+                    promo['title'] ?? 'Promo Tanpa Nama',
                     style: const TextStyle(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       fontSize: 16,
-                      color: Color(0xFF1E293B),
+                      color: Colors.black,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildModernChip(
-                        'Code: ${promo['code']}',
+                        'Kode: ${promo['code']}',
                         const Color(0xFF8B5CF6),
                       ),
                       const SizedBox(height: 4),
                       _buildModernChip(
-                        'Discount: ${promo['discount_value']}${promo['discount_type'] == 'percentage' ? '%' : ' Rp'}',
+                        'Diskon: ${promo['discount_value']}${promo['discount_type'] == 'percentage' ? '%' : ' Rp'}',
                         const Color(0xFFF59E0B),
                       ),
                     ],
@@ -968,33 +1193,19 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                 ],
               ),
             ),
-            // Direct Edit and Delete buttons
+            // Action buttons
             Row(
               children: [
-                InkWell(
-                  onTap: () => _showEditPromoDialog(promo),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    child: Icon(
-                      Icons.edit_outlined,
-                      size: 20,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
+                _buildActionButton(
+                  Icons.edit_outlined,
+                  Colors.grey.shade600,
+                      () => _showEditPromoDialog(promo),
                 ),
-                const SizedBox(width: 4),
-                InkWell(
-                  onTap: () => _showDeletePromoDialog(promo['id']),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(
-                      Icons.delete_outline,
-                      size: 20,
-                      color: Color(0xFFEF4444),
-                    ),
-                  ),
+                const SizedBox(width: 8),
+                _buildActionButton(
+                  Icons.delete_outline,
+                  const Color(0xFFEF4444),
+                      () => _showDeletePromoDialog(promo['id']),
                 ),
               ],
             ),
@@ -1004,12 +1215,31 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
     );
   }
 
+  Widget _buildActionButton(IconData icon, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: color,
+        ),
+      ),
+    );
+  }
+
   Widget _buildModernChip(String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         text,
@@ -1053,19 +1283,19 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           title,
           style: const TextStyle(
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
             fontSize: 18,
-            color: Color(0xFF1E293B),
+            color: Colors.black,
           ),
         ),
         content: Text(
           content,
           style: const TextStyle(
-            fontWeight: FontWeight.w400,
+            fontWeight: FontWeight.w500,
             fontSize: 14,
             color: Color(0xFF64748B),
           ),
@@ -1073,44 +1303,59 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              setState(() => _isLoading = true);
-              try {
-                final success = await deleteFunction(id);
-                if (!mounted) return;
-                setState(() => _isLoading = false);
-                _showSnackBar(success
-                    ? '${title.split(' ')[1]} deleted successfully'
-                    : 'Failed to delete ${title.toLowerCase().split(' ')[1]}');
-                if (success) _loadStoreData();
-              } catch (e) {
-                if (!mounted) return;
-                setState(() => _isLoading = false);
-                _showSnackBar('Error deleting ${title.toLowerCase().split(' ')[1]}: $e');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              elevation: 0,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey.shade600,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
             child: const Text(
-              'Delete',
+              'Batal',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+            ),
+            child: ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                setState(() => _isLoading = true);
+                try {
+                  final success = await deleteFunction(id);
+                  if (!mounted) return;
+                  setState(() => _isLoading = false);
+                  _showSnackBar(success
+                      ? '${title.split(' ')[1]} berhasil dihapus'
+                      : 'Gagal menghapus ${title.toLowerCase().split(' ')[1]}');
+                  if (success) _loadStoreData();
+                } catch (e) {
+                  if (!mounted) return;
+                  setState(() => _isLoading = false);
+                  _showSnackBar('Error menghapus ${title.toLowerCase().split(' ')[1]}: $e');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Hapus',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -1143,16 +1388,16 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         setState(() => _isLoading = false);
 
         if (success) {
-          _showSnackBar('Store image updated successfully');
+          _showSnackBar('Gambar toko berhasil diperbarui');
           _loadStoreData();
         } else {
-          _showSnackBar('Failed to update store image');
+          _showSnackBar('Gagal memperbarui gambar toko');
         }
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showSnackBar('Error updating store image: $e');
+      _showSnackBar('Error memperbarui gambar toko: $e');
     }
   }
 
@@ -1170,12 +1415,12 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
 
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showSnackBar(success ? 'Store profile updated successfully' : 'Failed to update store profile');
+      _showSnackBar(success ? 'Profil toko berhasil diperbarui' : 'Gagal memperbarui profil toko');
       if (success) _loadStoreData();
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showSnackBar('Error updating store profile: $e');
+      _showSnackBar('Error memperbarui profil toko: $e');
     }
   }
 
@@ -1186,7 +1431,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         storeId: _storeData!['id'],
         onSuccess: () {
           _loadStoreData();
-          _showSnackBar('Product added successfully');
+          _showSnackBar('Produk berhasil ditambahkan');
         },
       ),
     );
@@ -1200,7 +1445,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         storeId: _storeData!['id'],
         onSuccess: () {
           _loadStoreData();
-          _showSnackBar('Product updated successfully');
+          _showSnackBar('Produk berhasil diperbarui');
         },
       ),
     );
@@ -1213,7 +1458,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         storeId: _storeData!['id'],
         onSuccess: () {
           _loadStoreData();
-          _showSnackBar('Promo added successfully');
+          _showSnackBar('Promo berhasil ditambahkan');
         },
       ),
     );
@@ -1227,24 +1472,24 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
         storeId: _storeData!['id'],
         onSuccess: () {
           _loadStoreData();
-          _showSnackBar('Promo updated successfully');
+          _showSnackBar('Promo berhasil diperbarui');
         },
       ),
     );
   }
 
   void _showDeleteProductDialog(String productId) =>
-      _showDeleteDialog('Delete Product', 'Are you sure you want to delete this product?', productId, StoreService.deleteProduct);
+      _showDeleteDialog('Hapus Produk', 'Apakah Anda yakin ingin menghapus produk ini?', productId, StoreService.deleteProduct);
   void _showDeletePromoDialog(String promoId) =>
-      _showDeleteDialog('Delete Promo', 'Are you sure you want to delete this promo?', promoId, StoreService.deletePromo);
+      _showDeleteDialog('Hapus Promo', 'Apakah Anda yakin ingin menghapus promo ini?', promoId, StoreService.deletePromo);
 
   Future<void> _updateOrderStatus(String orderId, String status) async {
     try {
       await OrderService.updateOrderStatus(orderId, status, widget.storeId);
       await _loadStoreData();
-      _showSnackBar('Order status updated successfully');
+      _showSnackBar('Status pesanan berhasil diperbarui');
     } catch (e) {
-      _showSnackBar('Error updating order status: $e');
+      _showSnackBar('Error memperbarui status pesanan: $e');
     }
   }
 }
