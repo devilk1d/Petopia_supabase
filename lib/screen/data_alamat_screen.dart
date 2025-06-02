@@ -3,6 +3,10 @@ import '../utils/colors.dart';
 import '../models/address_model.dart';
 import '../services/address_service.dart';
 import '../services/auth_service.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class AddressFormScreen extends StatefulWidget {
   final AddressModel? address;
@@ -39,6 +43,12 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     {'label': 'Lainnya', 'icon': Icons.location_on_rounded},
   ];
 
+  LatLng? _pickedLocation;
+  final TextEditingController _searchMapController = TextEditingController();
+  bool _isSearchingMap = false;
+  final MapController _mapController = MapController();
+  double _currentZoom = 14;
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +66,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _postalCodeController.text = address.postalCode;
     _selectedCity = address.city;
     _isDefault = address.isDefault;
+    if (address.latitude != null && address.longitude != null) {
+      _pickedLocation = LatLng(address.latitude!, address.longitude!);
+    }
   }
 
   @override
@@ -65,6 +78,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _phoneController.dispose();
     _addressController.dispose();
     _postalCodeController.dispose();
+    _searchMapController.dispose();
     super.dispose();
   }
 
@@ -92,6 +106,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         address: _addressController.text.trim(),
         city: _selectedCity,
         postalCode: _postalCodeController.text.trim(),
+        latitude: _pickedLocation?.latitude,
+        longitude: _pickedLocation?.longitude,
         isDefault: _isDefault,
         createdAt: widget.address?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
@@ -243,6 +259,174 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                         return null;
                       },
                     ),
+
+                    const SizedBox(height: 16),
+
+                    // Search address for map
+                    Text(
+                      'Cari Alamat di Peta',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro Display',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchMapController,
+                            decoration: InputDecoration(
+                              hintText: 'Cari alamat (misal: Monas, Jakarta)',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              isDense: true,
+                            ),
+                            style: const TextStyle(fontFamily: 'SF Pro Display', fontSize: 14),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _isSearchingMap ? null : () async {
+                            final query = _searchMapController.text.trim();
+                            if (query.isEmpty) return;
+                            setState(() => _isSearchingMap = true);
+                            try {
+                              final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=1');
+                              final response = await http.get(url, headers: {'User-Agent': 'petopia-app'});
+                              final results = json.decode(response.body);
+                              if (results != null && results.isNotEmpty) {
+                                final lat = double.tryParse(results[0]['lat'] ?? '');
+                                final lon = double.tryParse(results[0]['lon'] ?? '');
+                                if (lat != null && lon != null) {
+                                  setState(() {
+                                    _pickedLocation = LatLng(lat, lon);
+                                    _mapController.move(LatLng(lat, lon), _currentZoom);
+                                  });
+                                }
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Alamat tidak ditemukan!')),
+                                );
+                              }
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Gagal mencari alamat: $e')),
+                              );
+                            } finally {
+                              setState(() => _isSearchingMap = false);
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryColor,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          child: _isSearchingMap
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.search, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    Text(
+                      'Pilih Lokasi di Peta',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro Display',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Stack(
+                          children: [
+                            FlutterMap(
+                              mapController: _mapController,
+                              options: MapOptions(
+                                center: _pickedLocation ?? LatLng(-6.2, 106.8),
+                                zoom: _currentZoom,
+                                onTap: (tapPosition, point) {
+                                  setState(() {
+                                    _pickedLocation = point;
+                                  });
+                                },
+                                interactiveFlags: InteractiveFlag.all,
+                                onPositionChanged: (pos, hasGesture) {
+                                  setState(() {
+                                    _currentZoom = pos.zoom ?? _currentZoom;
+                                  });
+                                },
+                              ),
+                              children: [
+                                TileLayer(
+                                  urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                                ),
+                                if (_pickedLocation != null)
+                                  MarkerLayer(
+                                    markers: [
+                                      Marker(
+                                        point: _pickedLocation!,
+                                        width: 40,
+                                        height: 40,
+                                        child: Icon(Icons.location_on, color: AppColors.primaryColor, size: 40),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                            Positioned(
+                              top: 10,
+                              right: 10,
+                              child: Column(
+                                children: [
+                                  FloatingActionButton(
+                                    mini: true,
+                                    heroTag: 'zoomIn',
+                                    backgroundColor: AppColors.primaryColor,
+                                    onPressed: () {
+                                      _mapController.move(_mapController.center, _currentZoom + 1);
+                                    },
+                                    child: const Icon(Icons.add),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  FloatingActionButton(
+                                    mini: true,
+                                    heroTag: 'zoomOut',
+                                    backgroundColor: AppColors.primaryColor,
+                                    onPressed: () {
+                                      _mapController.move(_mapController.center, _currentZoom - 1);
+                                    },
+                                    child: const Icon(Icons.remove),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_pickedLocation != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          'Lokasi: [38;5;245m${_pickedLocation!.latitude.toStringAsFixed(5)}, ${_pickedLocation!.longitude.toStringAsFixed(5)}',
+                          style: const TextStyle(fontSize: 13, color: Colors.black54),
+                        ),
+                      ),
 
                     const SizedBox(height: 24),
 
@@ -567,7 +751,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 _isDefault = value;
               });
             },
-            activeColor: AppColors.primaryColor,
+            activeColor: AppColors.primaryColor, // warna saat aktif
+            inactiveThumbColor: Colors.grey,     // warna thumb saat nonaktif
+            inactiveTrackColor: Colors.grey[300], // warna background track saat nonaktif
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ],

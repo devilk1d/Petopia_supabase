@@ -63,6 +63,8 @@ class PromoService {
   // Validate promo code
   static Future<PromoModel?> validatePromoCode(String code, double totalAmount) async {
     try {
+      print('Validating promo code: $code for total amount: $totalAmount');
+
       final response = await _client
           .from('promos')
           .select()
@@ -70,18 +72,47 @@ class PromoService {
           .eq('is_active', true)
           .maybeSingle();
 
-      if (response == null) return null;
+      if (response == null) {
+        print('Promo code not found');
+        return null;
+      }
 
       final promo = PromoModel.fromJson(response);
 
       // Check if promo is valid
-      if (!promo.isActive) return null;
-      if (totalAmount < promo.minPurchase) return null;
-      if (promo.endDate != null && DateTime.now().isAfter(promo.endDate!)) return null;
-      if (promo.usageLimit != null && promo.usedCount >= promo.usageLimit!) return null;
+      if (!promo.isActive) {
+        print('Promo is not active');
+        return null;
+      }
 
+      // Validate dates
+      final now = DateTime.now();
+      if (now.isBefore(promo.startDate)) {
+        print('Promo has not started yet. Start date: ${promo.startDate}');
+        return null;
+      }
+
+      if (promo.endDate != null && now.isAfter(promo.endDate!)) {
+        print('Promo has expired. End date: ${promo.endDate}');
+        return null;
+      }
+
+      // Check minimum purchase
+      if (totalAmount < promo.minPurchase) {
+        print('Total amount does not meet minimum purchase requirement. Required: ${promo.minPurchase}, Current: $totalAmount');
+        return null;
+      }
+
+      // Check usage limit
+      if (promo.usageLimit != null && promo.usedCount >= promo.usageLimit!) {
+        print('Promo usage limit reached. Limit: ${promo.usageLimit}, Used: ${promo.usedCount}');
+        return null;
+      }
+
+      print('Promo code is valid');
       return promo;
     } catch (e) {
+      print('Error validating promo code: $e');
       return null;
     }
   }
@@ -121,6 +152,27 @@ class PromoService {
       final userId = AuthService.currentUserId;
       if (userId == null) throw Exception('User not authenticated');
 
+      // Validate discount type
+      if (discountType != 'percentage' && discountType != 'fixed') {
+        throw Exception('Invalid discount type. Must be either "percentage" or "fixed"');
+      }
+
+      // Validate discount value
+      if (discountValue <= 0) {
+        throw Exception('Discount value must be greater than 0');
+      }
+
+      // Validate percentage discount
+      if (discountType == 'percentage' && discountValue > 100) {
+        throw Exception('Percentage discount cannot exceed 100%');
+      }
+
+      // Validate dates
+      final now = DateTime.now();
+      if (endDate != null && endDate.isBefore(now)) {
+        throw Exception('End date cannot be in the past');
+      }
+
       final promoData = {
         'code': code.toUpperCase(),
         'title': title,
@@ -130,10 +182,15 @@ class PromoService {
         'min_purchase': minPurchase,
         'max_discount': maxDiscount,
         'usage_limit': usageLimit,
+        'start_date': now.toIso8601String(),
         'end_date': endDate?.toIso8601String(),
+        'is_active': true,
+        'created_at': now.toIso8601String(),
         if (sellerId != null) 'seller_id': sellerId,
-        if (sellerId == null) 'admin_id': userId, // Assume admin if no seller_id
+        if (sellerId == null) 'admin_id': userId,
       };
+
+      print('Creating promo with data: $promoData');
 
       final response = await _client
           .from('promos')
@@ -143,6 +200,7 @@ class PromoService {
 
       return PromoModel.fromJson(response);
     } catch (e) {
+      print('Error creating promo: $e');
       throw Exception('Failed to create promo: $e');
     }
   }

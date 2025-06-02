@@ -14,6 +14,7 @@ import '../models/promo_model.dart';
 import '../models/product_model.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
+import '../utils/format.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -771,9 +772,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 title: promo.title,
                                 subtitle: promo.discountType == 'percentage'
                                     ? '${promo.discountValue.toStringAsFixed(0)}% OFF'
-                                    : 'Rp${promo.discountValue.toStringAsFixed(0)} OFF',
+                                    : '${formatRupiah(promo.discountValue)} OFF',
                                 description: promo.description ?? '',
-                                buttonText: 'Use Code: ${promo.code}',
+                                promoCode: promo.code,
                                 backgroundColor: index % 4 == 0
                                     ? AppColors.purpleBanner
                                     : index % 4 == 1

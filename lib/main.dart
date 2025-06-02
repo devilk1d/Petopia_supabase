@@ -28,6 +28,7 @@ import 'screen/complaint_screen.dart';
 import 'screen/notif_screen.dart';
 import 'screen/category_product_screen.dart';
 import 'services/supabase_config.dart';
+import 'models/address_model.dart';
 
 void main() async {
   // Ensure Flutter is initialized
@@ -91,7 +92,10 @@ class MyApp extends StatelessWidget {
         '/user-profile': (context) => const UserProfile(),
         '/store-profile': (context) => const StoreProfile(),
         '/address-list': (context) => const AddressListScreen(),
-        '/address-edit': (context) => const AddressFormScreen(),
+        '/address-edit': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments;
+          return AddressFormScreen(address: args is AddressModel ? args : null);
+        },
         '/article-detail': (context) => const ArticleDetailPage(),
         '/register-toko': (context) => const RegisterTokoScreen(),
         '/complaint': (context) => const ComplaintScreen(),

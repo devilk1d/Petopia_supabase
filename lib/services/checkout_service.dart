@@ -2,6 +2,7 @@
 import 'supabase_config.dart';
 import 'auth_service.dart';
 import '../models/address_model.dart';
+import '../services/promo_service.dart';
 
 class CheckoutService {
   static final _client = SupabaseConfig.client;
@@ -246,42 +247,22 @@ class CheckoutService {
     try {
       print('Applying promo code: $promoCode for subtotal: $subtotal');
 
-      final response = await _client
-          .from('promos')
-          .select()
-          .eq('code', promoCode.toUpperCase())
-          .eq('is_active', true)
-          .gte('end_date', DateTime.now().toIso8601String())
-          .lte('min_purchase', subtotal)
-          .maybeSingle();
-
-      if (response == null) {
-        print('Promo code not found or not valid');
+      // Use PromoService to validate the promo code
+      final promo = await PromoService.validatePromoCode(promoCode, subtotal);
+      if (promo == null) {
+        print('Promo code validation failed');
         return null;
       }
 
       // Calculate discount
-      double discountAmount = 0;
-      if (response['discount_type'] == 'percentage') {
-        discountAmount = subtotal * (response['discount_value'] / 100);
-
-        // Apply max discount limit if exists
-        if (response['max_discount'] != null) {
-          double maxDiscount = (response['max_discount'] as num).toDouble();
-          if (discountAmount > maxDiscount) {
-            discountAmount = maxDiscount;
-          }
-        }
-      } else {
-        discountAmount = (response['discount_value'] as num).toDouble();
-      }
+      double discountAmount = promo.calculateDiscount(subtotal);
 
       print('Promo applied successfully, discount: $discountAmount');
 
       return {
-        'promo_id': response['id'],
+        'promo_id': promo.id,
         'discount_amount': discountAmount,
-        'promo_title': response['title'],
+        'promo_title': promo.title,
       };
     } catch (e) {
       print('Error applying promo code: $e');

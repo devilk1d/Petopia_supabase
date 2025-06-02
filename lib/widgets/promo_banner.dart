@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
+import 'package:flutter/services.dart';
 
 class PromoBanner extends StatelessWidget {
   final String title;
   final String subtitle;
   final String description;
-  final String buttonText;
+  final String promoCode;
   final Color backgroundColor;
   final String imagePath;
 
@@ -14,7 +15,7 @@ class PromoBanner extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.description,
-    required this.buttonText,
+    required this.promoCode,
     required this.backgroundColor,
     required this.imagePath,
   }) : super(key: key);
@@ -124,27 +125,37 @@ class PromoBanner extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6), // Space before button
-              // Adjusted button size and padding to match design
               Container(
-                height: 35, // Reduced height
-                child: ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: backgroundColor,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
+                height: 35,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(30),
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: promoCode));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Promo code copied!')),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(30),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  ),
-                  child: Text(
-                    buttonText,
-                    style: TextStyle(
-                      fontFamily: 'SF Pro Display',
-                      fontSize: 12, // Smaller font size
-                      fontWeight: FontWeight.w700,
-                      color: backgroundColor,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.copy, color: backgroundColor, size: 20),
+                        const SizedBox(width: 6),
+                        Text(
+                          promoCode,
+                          style: TextStyle(
+                            color: backgroundColor,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'SF Pro Display',
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -165,7 +176,7 @@ class PromoBanner extends StatelessWidget {
                 style: const TextStyle(
                   fontFamily: 'SF Pro Display',
                   fontSize: 20,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
               ),
@@ -173,8 +184,8 @@ class PromoBanner extends StatelessWidget {
                 subtitle,
                 style: const TextStyle(
                   fontFamily: 'SF Pro Display',
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
                   color: Colors.white,
                 ),
               ),
@@ -183,30 +194,41 @@ class PromoBanner extends StatelessWidget {
                 description,
                 style: const TextStyle(
                   fontFamily: 'SF Pro Display',
-                  fontSize: 11,
+                  fontSize: 14,
                   fontWeight: FontWeight.w400,
                   color: Colors.white,
                 ),
               ),
               const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: backgroundColor,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
+              InkWell(
+                borderRadius: BorderRadius.circular(30),
+                onTap: () async {
+                  await Clipboard.setData(ClipboardData(text: promoCode));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Promo code copied!')),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(30),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                ),
-                child: Text(
-                  buttonText,
-                  style: TextStyle(
-                    fontFamily: 'SF Pro Display',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: backgroundColor,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.copy, color: backgroundColor, size: 20),
+                      const SizedBox(width: 6),
+                      Text(
+                        promoCode,
+                        style: TextStyle(
+                          color: backgroundColor,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'SF Pro Display',
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

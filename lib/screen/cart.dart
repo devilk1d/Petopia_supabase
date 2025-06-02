@@ -312,14 +312,19 @@ class _CartScreenState extends State<CartScreen> {
           const Text(
             'Keranjang Belanja Kosong',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+              fontFamily: 'SF Pro Display',
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
           const Text(
             'Belum ada barang di keranjang',
             style: TextStyle(
+              fontFamily: 'SF Pro Display',
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
               color: Colors.grey,
             ),
           ),
@@ -338,7 +343,9 @@ class _CartScreenState extends State<CartScreen> {
             child: const Text(
               'Mulai Belanja',
               style: TextStyle(
+                fontFamily: 'SF Pro Display',
                 fontSize: 16,
+                color: Colors.white,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -814,44 +821,7 @@ class _CartScreenState extends State<CartScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Promo code input
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _promoController,
-                        decoration: const InputDecoration(
-                          hintText: 'Masukkan kode promo',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        // Handle promo code
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primaryColor,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                      ),
-                      child: const Text(
-                        'Gunakan',
-                        style: TextStyle(
-                          fontFamily: 'SF Pro Display',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 1),
               // Total and checkout button
               Row(
                 children: [
