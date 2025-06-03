@@ -85,22 +85,31 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
       final promos = await StoreService.getStorePromos(store['id']);
       final orderModels = await OrderService.getOrdersBySeller(store['id']);
 
-      final orders = orderModels.map((order) => {
-        'id': order.id,
-        'order_number': order.orderNumber,
-        'status': order.status,
-        'created_at': order.createdAt.toIso8601String(),
-        'order_items': order.items.map((item) => {
-          'id': item.id,
-          'product_id': item.productId,
-          'quantity': item.quantity,
-          'price': item.price,
-          'variant': item.variant,
-          'products': {
-            'name': item.productName ?? 'Unknown Product',
-            'images': item.productImage != null ? [item.productImage] : [],
-          },
-        }).toList(),
+      // Fixed: Properly convert OrderModel to Map with correct item processing
+      final orders = orderModels.map((order) {
+        print('Processing order: ${order.id} with ${order.items.length} items');
+
+        return {
+          'id': order.id,
+          'order_number': order.orderNumber,
+          'status': order.status,
+          'created_at': order.createdAt.toIso8601String(),
+          'order_items': order.items.map((item) {
+            print('Processing item: ${item.id} - ${item.productName}');
+
+            return {
+              'id': item.id,
+              'product_id': item.productId,
+              'quantity': item.quantity,
+              'price': item.price,
+              'variant': item.variant ?? '',
+              'products': {
+                'name': item.productName ?? 'Unknown Product',
+                'images': item.productImage != null ? [item.productImage] : [],
+              },
+            };
+          }).toList(),
+        };
       }).toList();
 
       if (mounted) {
@@ -112,8 +121,14 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
           _isLoading = false;
         });
         _initializeFormControllers();
+
+        print('Loaded ${_orders.length} orders');
+        for (var order in _orders) {
+          print('Order ${order['order_number']}: ${(order['order_items'] as List).length} items');
+        }
       }
     } catch (e) {
+      print('Error loading store data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
         _showSnackBar('Error: $e');
@@ -260,9 +275,6 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
       floatingActionButton: _buildModernFAB(),
     );
   }
-
-  // Hapus method _buildModernAppBar() dan _buildModernTabBar() karena tidak digunakan lagi
-  // Hapus juga method _buildStoreInfoCard() karena info sudah ada di header
 
   Widget _buildModernFAB() {
     if (_tabController.index == 0 || _tabController.index == 3) {
@@ -674,11 +686,22 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
       itemCount: _orders.length,
       itemBuilder: (context, index) {
         final order = _orders[index];
-        final orderItems = order['order_items'] as List;
-        final status = order['status'] as String;
-        final orderNumber = order['order_number'] as String;
-        final orderId = order['id'] as String;
-        final orderDate = DateTime.parse(order['created_at'] as String);
+
+        // Safe casting with null check
+        final orderItemsList = order['order_items'];
+        final orderItems = orderItemsList is List ? orderItemsList : <Map<String, dynamic>>[];
+
+        final status = order['status'] as String? ?? 'unknown';
+        final orderNumber = order['order_number'] as String? ?? 'Unknown';
+        final orderId = order['id'] as String? ?? '';
+
+        DateTime orderDate;
+        try {
+          orderDate = DateTime.parse(order['created_at'] as String);
+        } catch (e) {
+          orderDate = DateTime.now();
+        }
+
         final formattedDate = '${orderDate.day}/${orderDate.month}/${orderDate.year}';
         final isExpanded = _expandedOrders[orderId] ?? false;
 
@@ -768,7 +791,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                       ),
                       const SizedBox(height: 16),
 
-                      // Order Summary
+                      // Order Summary - Fixed to show correct item count
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -825,12 +848,12 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                       ),
                       const SizedBox(height: 12),
 
-                      // Order Items List
-                      ...orderItems.map((item) {
-                        final product = item['products'];
-                        final quantity = item['quantity'] as int;
-                        final price = (item['price'] as num).toDouble();
-                        final variant = item['variant'] as String?;
+                      // Order Items List - Fixed processing
+                      ...orderItems.map<Widget>((item) {
+                        final products = item['products'] as Map<String, dynamic>? ?? {};
+                        final quantity = item['quantity'] as int? ?? 0;
+                        final price = ((item['price'] as num?) ?? 0).toDouble();
+                        final variant = (item['variant'] as String?) ?? '';
                         final totalItemPrice = quantity * price;
 
                         return Container(
@@ -852,21 +875,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  child: (product['images'] as List).isNotEmpty
-                                      ? Image.network(
-                                    product['images'][0],
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return const Icon(
-                                        Icons.image_not_supported_outlined,
-                                        color: Colors.grey,
-                                      );
-                                    },
-                                  )
-                                      : const Icon(
-                                    Icons.image_not_supported_outlined,
-                                    color: Colors.grey,
-                                  ),
+                                  child: _buildProductImage(products),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -877,14 +886,14 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      product['name'] ?? 'Produk Tidak Diketahui',
+                                      products['name'] as String? ?? 'Produk Tidak Diketahui',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 14,
                                         color: Colors.black,
                                       ),
                                     ),
-                                    if (variant != null && variant.isNotEmpty) ...[
+                                    if (variant.isNotEmpty) ...[
                                       const SizedBox(height: 4),
                                       Text(
                                         'Varian: $variant',
@@ -1001,6 +1010,32 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
           ),
         );
       },
+    );
+  }
+
+  // Helper method to build product image with proper error handling
+  Widget _buildProductImage(Map<String, dynamic> products) {
+    final imagesList = products['images'];
+
+    if (imagesList is List && imagesList.isNotEmpty) {
+      final imageUrl = imagesList[0] as String?;
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        return Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return const Icon(
+              Icons.image_not_supported_outlined,
+              color: Colors.grey,
+            );
+          },
+        );
+      }
+    }
+
+    return const Icon(
+      Icons.image_not_supported_outlined,
+      color: Colors.grey,
     );
   }
 

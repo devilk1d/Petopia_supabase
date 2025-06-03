@@ -392,57 +392,114 @@ class OrderService {
   // Get orders by seller
   static Future<List<OrderModel>> getOrdersBySeller(String sellerId) async {
     try {
+      print('Fetching orders for seller: $sellerId');
+
+      // Query untuk mendapatkan semua order items untuk seller ini
       final response = await _client
           .from('order_items')
           .select('''
-            *,
-            orders!inner(*),
-            products!inner(
-              id,
-              name,
-              price,
-              images,
-              description,
-              seller_id,
-              sellers!inner(
-                id,
-                store_name,
-                store_image_url
-              )
-            )
-          ''')
+          *,
+          orders!inner(
+            id,
+            order_number,
+            status,
+            payment_status,
+            total_amount,
+            created_at,
+            updated_at
+          ),
+          products!inner(
+            id,
+            name,
+            price,
+            images,
+            description
+          )
+        ''')
           .eq('seller_id', sellerId)
           .order('created_at', ascending: false);
 
-      // Group by order_id and convert to OrderModel
+      print('Raw response length: ${response.length}');
+
+      if (response.isEmpty) {
+        print('No orders found for seller');
+        return [];
+      }
+
+      // Group by order_id untuk menghindari duplikasi
       Map<String, Map<String, dynamic>> ordersMap = {};
 
       for (var item in response) {
-        final orderId = item['orders']['id'];
+        final orderData = item['orders'] as Map<String, dynamic>;
+        final productData = item['products'] as Map<String, dynamic>;
+        final orderId = orderData['id'] as String;
+
+        print('Processing item for order: $orderId');
+        print('Product: ${productData['name']}');
+
+        // Jika order belum ada di map, buat entry baru
         if (!ordersMap.containsKey(orderId)) {
           ordersMap[orderId] = {
-            ...item['orders'],
-            'order_items': [],
+            'id': orderId,
+            'order_number': orderData['order_number'],
+            'status': orderData['status'],
+            'payment_status': orderData['payment_status'],
+            'total_amount': orderData['total_amount'],
+            'created_at': orderData['created_at'],
+            'updated_at': orderData['updated_at'],
+            'order_items': <Map<String, dynamic>>[],
           };
         }
-        
-        // Process the product data
-        final product = item['products'];
-        final seller = product['sellers'];
-        
-        ordersMap[orderId]!['order_items'].add({
-          ...item,
-          'product_name': product['name'],
-          'product_image': (product['images'] as List).isNotEmpty ? product['images'][0] : null,
-          'store_name': seller['store_name'],
-          'store_image': seller['store_image_url'],
-        });
+
+        // Tambahkan item ke order
+        final orderItem = {
+          'id': item['id'],
+          'order_id': item['order_id'],
+          'product_id': item['product_id'],
+          'seller_id': item['seller_id'],
+          'quantity': item['quantity'],
+          'price': (item['price'] as num).toDouble(),
+          'variant': item['variant'] ?? '',
+          'created_at': item['created_at'],
+          // Product information
+          'product_name': productData['name'],
+          'product_image': (productData['images'] as List).isNotEmpty
+              ? productData['images'][0]
+              : null,
+          'product_description': productData['description'],
+        };
+
+        ordersMap[orderId]!['order_items'].add(orderItem);
       }
 
-      return ordersMap.values
-          .map((json) => OrderModel.fromJson(json))
-          .toList();
+      print('Processed ${ordersMap.length} unique orders');
+
+      // Convert ke List<OrderModel>
+      final ordersList = ordersMap.values.map((orderJson) {
+        print('Converting order ${orderJson['order_number']} with ${(orderJson['order_items'] as List).length} items');
+
+        try {
+          return OrderModel.fromJson(orderJson);
+        } catch (e) {
+          print('Error converting order ${orderJson['id']}: $e');
+          print('Order JSON: $orderJson');
+          rethrow;
+        }
+      }).toList();
+
+      // Sort by created_at descending
+      ordersList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      print('Final orders count: ${ordersList.length}');
+      for (var order in ordersList) {
+        print('Order ${order.orderNumber}: ${order.items.length} items');
+      }
+
+      return ordersList;
+
     } catch (e) {
+      print('Error in getOrdersBySeller: $e');
+      print('Stack trace: ${StackTrace.current}');
       throw Exception('Failed to fetch seller orders: $e');
     }
   }

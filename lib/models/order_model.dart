@@ -1,108 +1,4 @@
-import 'order_item_model.dart';
-
-class OrderModel {
-  final String id;
-  final String userId;
-  final String orderNumber;
-  final double totalAmount;
-  final double shippingCost;
-  final double discountAmount;
-  final String? promoId;
-  final String? paymentMethodId;
-  final String? shippingMethodId;
-  final Map<String, dynamic> shippingAddress;
-  final String status;
-  final String paymentStatus;
-  final String? trackingNumber;
-  final String? notes;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final List<OrderItemModel> items;
-
-  OrderModel({
-    required this.id,
-    required this.userId,
-    required this.orderNumber,
-    required this.totalAmount,
-    required this.shippingCost,
-    required this.discountAmount,
-    this.promoId,
-    this.paymentMethodId,
-    this.shippingMethodId,
-    required this.shippingAddress,
-    required this.status,
-    required this.paymentStatus,
-    this.trackingNumber,
-    this.notes,
-    required this.createdAt,
-    required this.updatedAt,
-    required this.items,
-  });
-
-  factory OrderModel.fromJson(Map<String, dynamic> json) {
-    return OrderModel(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      orderNumber: json['order_number'] as String,
-      totalAmount: (json['total_amount'] as num).toDouble(),
-      shippingCost: (json['shipping_cost'] as num).toDouble(),
-      discountAmount: (json['discount_amount'] as num).toDouble(),
-      promoId: json['promo_id'] as String?,
-      paymentMethodId: json['payment_method_id'] as String?,
-      shippingMethodId: json['shipping_method_id'] as String?,
-      shippingAddress: json['shipping_address'] as Map<String, dynamic>,
-      status: json['status'] as String,
-      paymentStatus: json['payment_status'] as String,
-      trackingNumber: json['tracking_number'] as String?,
-      notes: json['notes'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-      items: (json['items'] as List? ?? [])
-          .map((item) => OrderItemModel.fromJson(item as Map<String, dynamic>))
-          .toList(),
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'user_id': userId,
-      'order_number': orderNumber,
-      'total_amount': totalAmount,
-      'shipping_cost': shippingCost,
-      'discount_amount': discountAmount,
-      'promo_id': promoId,
-      'payment_method_id': paymentMethodId,
-      'shipping_method_id': shippingMethodId,
-      'shipping_address': shippingAddress,
-      'status': status,
-      'payment_status': paymentStatus,
-      'tracking_number': trackingNumber,
-      'notes': notes,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-      'items': items.map((item) => item.toJson()).toList(),
-    };
-  }
-
-  String getStatusText() {
-    switch (status) {
-      case 'pending_payment':
-        return 'Menunggu Pembayaran';
-      case 'processing':
-        return 'Dalam Proses';
-      case 'waiting_shipment':
-        return 'Menunggu Barang Dikirim';
-      case 'shipped':
-        return 'Sedang Dikirim';
-      case 'delivered':
-        return 'Diterima';
-      default:
-        return status;
-    }
-  }
-}
-
+// File: lib/models/order_item_model.dart
 class OrderItemModel {
   final String id;
   final String orderId;
@@ -110,11 +6,13 @@ class OrderItemModel {
   final String sellerId;
   final int quantity;
   final double price;
-  final String? variant;
+  final String variant;
   final DateTime createdAt;
+
+  // Additional product information
   final String? productName;
   final String? productImage;
-  final String? storeName;
+  final String? productDescription;
 
   OrderItemModel({
     required this.id,
@@ -123,27 +21,35 @@ class OrderItemModel {
     required this.sellerId,
     required this.quantity,
     required this.price,
-    this.variant,
+    required this.variant,
     required this.createdAt,
     this.productName,
     this.productImage,
-    this.storeName,
+    this.productDescription,
   });
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
-    return OrderItemModel(
-      id: json['id'] as String,
-      orderId: json['order_id'] as String,
-      productId: json['product_id'] as String,
-      sellerId: json['seller_id'] as String,
-      quantity: json['quantity'] as int,
-      price: (json['price'] as num).toDouble(),
-      variant: json['variant'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      productName: json['product_name'] as String?,
-      productImage: json['product_image'] as String?,
-      storeName: json['store_name'] as String?,
-    );
+    try {
+      return OrderItemModel(
+        id: json['id'] as String? ?? '',
+        orderId: json['order_id'] as String? ?? '',
+        productId: json['product_id'] as String? ?? '',
+        sellerId: json['seller_id'] as String? ?? '',
+        quantity: json['quantity'] as int? ?? 0,
+        price: ((json['price'] as num?) ?? 0).toDouble(),
+        variant: json['variant'] as String? ?? '',
+        createdAt: json['created_at'] != null
+            ? DateTime.parse(json['created_at'] as String)
+            : DateTime.now(),
+        productName: json['product_name'] as String?,
+        productImage: json['product_image'] as String?,
+        productDescription: json['product_description'] as String?,
+      );
+    } catch (e) {
+      print('Error parsing OrderItemModel from JSON: $e');
+      print('JSON data: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -158,7 +64,107 @@ class OrderItemModel {
       'created_at': createdAt.toIso8601String(),
       'product_name': productName,
       'product_image': productImage,
-      'store_name': storeName,
+      'product_description': productDescription,
+    };
+  }
+}
+
+// File: lib/models/order_model.dart
+class OrderModel {
+  final String id;
+  final String userId;
+  final String orderNumber;
+  final double totalAmount;
+  final double shippingCost;
+  final double discountAmount;
+  final String status;
+  final String paymentStatus;
+  final String? trackingNumber;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final List<OrderItemModel> items;
+
+  OrderModel({
+    required this.id,
+    required this.userId,
+    required this.orderNumber,
+    required this.totalAmount,
+    required this.shippingCost,
+    required this.discountAmount,
+    required this.status,
+    required this.paymentStatus,
+    this.trackingNumber,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.items,
+  });
+
+  factory OrderModel.fromJson(Map<String, dynamic> json) {
+    try {
+      print('Parsing OrderModel from JSON...');
+      print('Order ID: ${json['id']}');
+      print('Order Items Count: ${(json['order_items'] as List?)?.length ?? 0}');
+
+      // Parse order items
+      List<OrderItemModel> orderItems = [];
+      if (json['order_items'] != null) {
+        final itemsList = json['order_items'] as List;
+        print('Processing ${itemsList.length} items');
+
+        for (var i = 0; i < itemsList.length; i++) {
+          try {
+            final item = itemsList[i] as Map<String, dynamic>;
+            print('Processing item $i: ${item['product_name']}');
+            orderItems.add(OrderItemModel.fromJson(item));
+          } catch (e) {
+            print('Error parsing item $i: $e');
+            print('Item data: ${itemsList[i]}');
+            // Continue processing other items instead of failing completely
+          }
+        }
+      }
+
+      print('Successfully parsed ${orderItems.length} items');
+
+      return OrderModel(
+        id: json['id'] as String? ?? '',
+        userId: json['user_id'] as String? ?? '',
+        orderNumber: json['order_number'] as String? ?? '',
+        totalAmount: ((json['total_amount'] as num?) ?? 0).toDouble(),
+        shippingCost: ((json['shipping_cost'] as num?) ?? 0).toDouble(),
+        discountAmount: ((json['discount_amount'] as num?) ?? 0).toDouble(),
+        status: json['status'] as String? ?? 'unknown',
+        paymentStatus: json['payment_status'] as String? ?? 'pending',
+        trackingNumber: json['tracking_number'] as String?,
+        createdAt: json['created_at'] != null
+            ? DateTime.parse(json['created_at'] as String)
+            : DateTime.now(),
+        updatedAt: json['updated_at'] != null
+            ? DateTime.parse(json['updated_at'] as String)
+            : DateTime.now(),
+        items: orderItems,
+      );
+    } catch (e) {
+      print('Error parsing OrderModel from JSON: $e');
+      print('JSON data: $json');
+      rethrow;
+    }
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'order_number': orderNumber,
+      'total_amount': totalAmount,
+      'shipping_cost': shippingCost,
+      'discount_amount': discountAmount,
+      'status': status,
+      'payment_status': paymentStatus,
+      'tracking_number': trackingNumber,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+      'order_items': items.map((item) => item.toJson()).toList(),
     };
   }
 }
