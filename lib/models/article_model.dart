@@ -6,6 +6,7 @@ class ArticleModel {
   final String content;
   final String? imageUrl;
   final String? authorName;
+  final String? authorImageUrl;
   final bool isPublished;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -21,6 +22,7 @@ class ArticleModel {
     required this.content,
     this.imageUrl,
     this.authorName,
+    this.authorImageUrl,
     required this.isPublished,
     required this.createdAt,
     required this.updatedAt,
@@ -36,6 +38,7 @@ class ArticleModel {
       content: json['content'],
       imageUrl: json['image_url'],
       authorName: json['author_name'],
+      authorImageUrl: json['author_image_url'],
       isPublished: json['is_published'] ?? false,
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
@@ -52,6 +55,7 @@ class ArticleModel {
       'content': content,
       'image_url': imageUrl,
       'author_name': authorName,
+      'author_image_url': authorImageUrl,
       'is_published': isPublished,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -66,6 +70,7 @@ class ArticleModel {
     String? content,
     String? imageUrl,
     String? authorName,
+    String? authorImageUrl,
     bool? isPublished,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -78,6 +83,7 @@ class ArticleModel {
       content: content ?? this.content,
       imageUrl: imageUrl ?? this.imageUrl,
       authorName: authorName ?? this.authorName,
+      authorImageUrl: authorImageUrl ?? this.authorImageUrl,
       isPublished: isPublished ?? this.isPublished,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

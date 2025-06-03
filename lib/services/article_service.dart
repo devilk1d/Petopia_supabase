@@ -16,16 +16,13 @@ class ArticleService {
           .from('articles')
           .select('''
             *,
-            article_categories!inner (
+            article_categories (
               name
-            ),
-            admins!inner (
-              full_name
             )
           ''')
           .eq('is_published', true);
-      
-      final filteredQuery = categoryId != null 
+
+      final filteredQuery = categoryId != null
           ? query.eq('category_id', categoryId)
           : query;
 
@@ -36,7 +33,8 @@ class ArticleService {
       return (response as List).map((json) {
         // Add joined data to the main object
         json['category_name'] = json['article_categories']?['name'];
-        json['author_name'] = json['admins']?['full_name'];
+        // author_name sudah ada di json langsung dari tabel articles
+        // Tidak perlu ambil dari tabel admins
 
         return ArticleModel.fromJson(json);
       }).toList();
@@ -45,33 +43,47 @@ class ArticleService {
     }
   }
 
-  // Get article by ID
+  // Get article by ID with full data for realtime updates
   static Future<ArticleModel?> getArticleById(String articleId) async {
     try {
       final response = await _client
           .from('articles')
           .select('''
             *,
-            article_categories!inner (
+            article_categories (
               name
-            ),
-            admins!inner (
-              full_name
             )
           ''')
           .eq('id', articleId)
-          .single();
+          .maybeSingle(); // Use maybeSingle instead of single to avoid exception
 
       if (response == null) return null;
 
       // Add joined data to the main object
       response['category_name'] = response['article_categories']?['name'];
-      response['author_name'] = response['admins']?['full_name'];
+      // author_name sudah ada di response langsung
 
       return ArticleModel.fromJson(response);
     } catch (e) {
+      print('Error fetching article by ID: $e');
       return null;
     }
+  }
+
+  // Stream for realtime articles (alternative approach)
+  static Stream<List<ArticleModel>> getArticlesStream() {
+    return _client
+        .from('articles')
+        .stream(primaryKey: ['id'])
+        .eq('is_published', true)
+        .order('created_at', ascending: false)
+        .map((data) {
+      return data.map((json) {
+        // Note: Stream doesn't support joins, so category_name will be null
+        // You might need to fetch categories separately
+        return ArticleModel.fromJson(json);
+      }).toList();
+    });
   }
 
   // Get articles by category
@@ -88,8 +100,8 @@ class ArticleService {
           .order('name');
 
       // Explicitly cast and convert the response
-      return (response as List).map((item) => 
-        Map<String, dynamic>.from(item as Map)
+      return (response as List).map((item) =>
+      Map<String, dynamic>.from(item as Map)
       ).toList();
     } catch (e) {
       print('Error fetching categories: $e');
@@ -104,11 +116,8 @@ class ArticleService {
           .from('articles')
           .select('''
             *,
-            article_categories!inner (
+            article_categories (
               name
-            ),
-            admins!inner (
-              full_name
             )
           ''')
           .eq('is_published', true)
@@ -117,7 +126,7 @@ class ArticleService {
 
       return (response as List).map((json) {
         json['category_name'] = json['article_categories']?['name'];
-        json['author_name'] = json['admins']?['full_name'];
+        // author_name sudah tersedia langsung dari json
 
         return ArticleModel.fromJson(json);
       }).toList();
@@ -133,11 +142,8 @@ class ArticleService {
           .from('articles')
           .select('''
             *,
-            article_categories!inner (
+            article_categories (
               name
-            ),
-            admins!inner (
-              full_name
             )
           ''')
           .eq('is_published', true)
@@ -146,7 +152,7 @@ class ArticleService {
 
       return (response as List).map((json) {
         json['category_name'] = json['article_categories']?['name'];
-        json['author_name'] = json['admins']?['full_name'];
+        // author_name sudah tersedia langsung
 
         return ArticleModel.fromJson(json);
       }).toList();
@@ -154,4 +160,4 @@ class ArticleService {
       throw Exception('Failed to search articles: $e');
     }
   }
-} 
+}
