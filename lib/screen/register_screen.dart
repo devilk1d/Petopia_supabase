@@ -17,6 +17,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _noHpController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   @override
   void dispose() {
@@ -36,7 +37,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final phone = _noHpController.text.trim();
 
     // Basic validation
-    if (fullName.isEmpty || username.isEmpty || email.isEmpty || password.isEmpty || phone.isEmpty) {
+    if (fullName.isEmpty || username.isEmpty || email.isEmpty ||
+        password.isEmpty || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill in all fields'),
@@ -95,16 +97,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
         username: username,
         phone: phone,
       );
-      
+
       if (response.user != null && mounted) {
         // Sign in after successful registration
         await AuthService.signIn(
           email: email,
           password: password,
         );
-        
+
         // Navigate to home
-        Navigator.of(context).pushReplacementNamed('/');
+        Navigator.of(context).pushReplacementNamed('/home');
       }
     } catch (e) {
       print('Registration error: $e');
@@ -119,7 +121,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         } else {
           errorMessage = 'Registration failed. Please try again later';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -135,6 +137,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isGoogleLoading = true);
+
+    try {
+      final response = await AuthService.signInWithGoogle();
+
+      if (mounted) {
+        if (response?.user != null) {
+          // Google Sign In successful
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Successfully signed in with Google!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pushReplacementNamed('/home');
+        } else {
+          // User cancelled or no response
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Google Sign In was cancelled'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Sign In failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGoogleLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -145,7 +189,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: SizedBox(
-              height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top,
+              height: MediaQuery
+                  .of(context)
+                  .size
+                  .height - MediaQuery
+                  .of(context)
+                  .padding
+                  .top,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -161,7 +211,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           color: Colors.black,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                        child: const Icon(Icons.arrow_back, color: Colors.white,
+                            size: 20),
                       ),
                     ),
                   ),
@@ -202,7 +253,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             controller: _namaController,
                             keyboardType: TextInputType.name,
                             decoration: _buildInputDecoration('Nama'),
-                            style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                            style: const TextStyle(
+                                fontFamily: 'Poppins', fontSize: 14),
                           ),
 
                           // Username Field
@@ -210,7 +262,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             controller: _usernameController,
                             keyboardType: TextInputType.text,
                             decoration: _buildInputDecoration('Username'),
-                            style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                            style: const TextStyle(
+                                fontFamily: 'Poppins', fontSize: 14),
                           ),
 
                           // Email Field
@@ -218,7 +271,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: _buildInputDecoration('Email'),
-                            style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                            style: const TextStyle(
+                                fontFamily: 'Poppins', fontSize: 14),
                           ),
 
                           // Password Field
@@ -238,10 +292,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 borderRadius: BorderRadius.circular(15),
                                 borderSide: BorderSide.none,
                               ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 12),
                               suffixIcon: IconButton(
                                 icon: Icon(
-                                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                  _obscurePassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
                                   color: Colors.grey,
                                   size: 20,
                                 ),
@@ -252,7 +309,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 },
                               ),
                             ),
-                            style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                            style: const TextStyle(
+                                fontFamily: 'Poppins', fontSize: 14),
                           ),
 
                           // No. HP Field
@@ -260,7 +318,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             controller: _noHpController,
                             keyboardType: TextInputType.phone,
                             decoration: _buildInputDecoration('No. HP'),
-                            style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                            style: const TextStyle(
+                                fontFamily: 'Poppins', fontSize: 14),
                           ),
 
                           // Sign Up Button
@@ -277,22 +336,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               child: _isLoading
                                   ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
                                   : const Text(
-                                      'Sign Up',
-                                      style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
+                                'Sign Up',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
                           ),
 
@@ -329,10 +388,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              _buildSocialButton('assets/images/icons/facebook.png'),
-                              _buildSocialButton('assets/images/icons/google.png'),
-                              _buildSocialButton('assets/images/icons/call.png'),
-                              _buildSocialButton('assets/images/icons/apple.png'),
+                              _buildSocialButton(
+                                  'assets/images/icons/facebook.png'),
+                              _buildSocialButton(
+                                  'assets/images/icons/google.png',
+                                  onTap: _handleGoogleSignIn,
+                                  isLoading: _isGoogleLoading),
+                              _buildSocialButton(
+                                  'assets/images/icons/call.png'),
+                              _buildSocialButton(
+                                  'assets/images/icons/apple.png'),
                             ],
                           ),
                         ],
@@ -358,7 +423,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => const LoginScreen()),
+                              MaterialPageRoute(
+                                  builder: (context) => const LoginScreen()),
                             );
                           },
                           child: const Text(
@@ -401,19 +467,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildSocialButton(String iconPath) {
-    return Container(
-      width: 60,
-      height: 44,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Center(
-        child: Image.asset(
-          iconPath,
-          width: 24,
-          height: 24,
+  Widget _buildSocialButton(String iconPath,
+      {VoidCallback? onTap, bool isLoading = false}) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        width: 60,
+        height: 44,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: isLoading
+            ? const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Color(0xFFB60051),
+            ),
+          ),
+        )
+            : Center(
+          child: Image.asset(
+            iconPath,
+            width: 24,
+            height: 24,
+          ),
         ),
       ),
     );

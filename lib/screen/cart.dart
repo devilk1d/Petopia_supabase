@@ -259,17 +259,20 @@ class _CartScreenState extends State<CartScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Silakan login terlebih dahulu',
+            'Silahkan login terlebih dahulu',
             style: TextStyle(
+              fontFamily: 'SF Pro Display',
               fontSize: 18,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           const Text(
             'untuk melihat keranjang belanja Anda',
             style: TextStyle(
+              fontFamily: 'SF Pro Display',
               color: Colors.grey,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 24),
@@ -282,13 +285,15 @@ class _CartScreenState extends State<CartScreen> {
               backgroundColor: AppColors.primaryColor,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(20),
               ),
             ),
             child: const Text(
               'Login',
               style: TextStyle(
+                fontFamily: 'SF Pro Display',
                 fontSize: 16,
+                color: Colors.white,
                 fontWeight: FontWeight.w600,
               ),
             ),

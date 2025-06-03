@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screen/register_screen.dart';
 import '../services/auth_service.dart';
+import '../utils/colors.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -14,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   @override
   void dispose() {
@@ -56,11 +58,11 @@ class _LoginScreenState extends State<LoginScreen> {
         email: email,
         password: password,
       );
-      
+
       if (mounted) {
         if (response.user != null) {
           // Login successful
-          Navigator.of(context).pushReplacementNamed('/');
+          Navigator.of(context).pushReplacementNamed('/home');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -88,11 +90,50 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isGoogleLoading = true);
+
+    try {
+      final response = await AuthService.signInWithGoogle();
+
+      if (mounted) {
+        if (response?.user != null) {
+          // Google Sign In successful
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Successfully signed in with Google!'),
+              backgroundColor: AppColors.primaryColor,
+            ),
+          );
+          Navigator.of(context).pushReplacementNamed('/home');
+        } else {
+          // User cancelled or no response
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Google Sign In was cancelled'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Sign In failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGoogleLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Get screen height for responsive sizing
-    final screenHeight = MediaQuery.of(context).size.height;
-
     return Scaffold(
       backgroundColor: Colors.white,
       resizeToAvoidBottomInset: false, // Prevent resizing when keyboard appears
@@ -238,22 +279,22 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         child: _isLoading
                             ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
                             : const Text(
-                                'Login',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 16, // Reduced font size
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
+                          'Login',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 16, // Reduced font size
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -295,7 +336,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _buildSocialButton('assets/images/icons/facebook.png'),
-                      _buildSocialButton('assets/images/icons/google.png'),
+                      _buildSocialButton('assets/images/icons/google.png', onTap: _handleGoogleSignIn, isLoading: _isGoogleLoading),
                       _buildSocialButton('assets/images/icons/call.png'),
                       _buildSocialButton('assets/images/icons/apple.png'),
                     ],
@@ -347,20 +388,31 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildSocialButton(String iconPath) {
-    return Container(
-      width: 45, // Reduced size
-      height: 45, // Reduced size
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10.0), // Reduced padding
-        child: Image.asset(
-          iconPath,
-          width: 20, // Reduced size
-          height: 20, // Reduced size
+  Widget _buildSocialButton(String iconPath, {VoidCallback? onTap, bool isLoading = false}) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        width: 45, // Reduced size
+        height: 45, // Reduced size
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: isLoading
+            ? const Padding(
+          padding: EdgeInsets.all(12.0),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Color(0xFFB60051),
+          ),
+        )
+            : Padding(
+          padding: const EdgeInsets.all(10.0), // Reduced padding
+          child: Image.asset(
+            iconPath,
+            width: 20, // Reduced size
+            height: 20, // Reduced size
+          ),
         ),
       ),
     );

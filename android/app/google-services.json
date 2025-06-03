@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "690711971091",
+    "project_id": "petopia-455209",
+    "storage_bucket": "petopia-455209.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:690711971091:android:dummy",
+        "android_client_info": {
+          "package_name": "com.example.petopia"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "690711971091-lp7oltob5duhlo3lbarvjtkqfdolfnj9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.petopia",
+            "certificate_hash": "C7F8A1280C22D034D4FEBBBDFC9604864098B74D"
+          }
+        },
+        {
+          "client_id": "690711971091-b9g8ssq60v354ikhf7cd2tj3bbgbcme7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAy_KX1XT0QepcXtb1BX14OBER5P6n-XKk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "690711971091-b9g8ssq60v354ikhf7cd2tj3bbgbcme7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

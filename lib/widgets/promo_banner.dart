@@ -299,7 +299,7 @@ class PromoBanner extends StatelessWidget {
                           fontFamily: 'SF Pro Display',
                           fontSize: 10,
                           color: Colors.white,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     if (startDate != null && endDate != null)
@@ -309,7 +309,7 @@ class PromoBanner extends StatelessWidget {
                           fontFamily: 'SF Pro Display',
                           fontSize: 10,
                           color: Colors.white,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                         ),
                       )
                     else if (startDate != null)

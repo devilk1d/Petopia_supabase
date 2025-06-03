@@ -1000,7 +1000,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Failed to add to cart: ${e.toString()}'),
-                        backgroundColor: Colors.red,
+                        backgroundColor: AppColors.primaryColor,
                         duration: const Duration(seconds: 3),
                       ),
                     );
