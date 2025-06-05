@@ -1334,7 +1334,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   // Complaint button
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.pushNamed(context, '/complaint'),
+                      onPressed: _navigateToComplaint,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.grey[700],
                         side: BorderSide(color: Colors.grey[300]!),
@@ -1409,6 +1409,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _navigateToComplaint() {
+    if (_orderData == null || _orderId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Data order tidak tersedia'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    Navigator.pushNamed(
+      context,
+      '/complaint',
+      arguments: {
+        'orderId': _orderId,
+        'orderData': _orderData,
+      },
     );
   }
 
