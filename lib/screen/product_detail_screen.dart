@@ -7,6 +7,7 @@ import '../services/wishlist_service.dart';
 import '../services/auth_service.dart';
 import 'package:intl/intl.dart';
 import '../services/cart_service.dart';
+import '../widgets/product_reviews_widget.dart'; // Import widget review
 
 class ProductDetailPage extends StatefulWidget {
   const ProductDetailPage({Key? key}) : super(key: key);
@@ -337,9 +338,16 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
                   ),
                 ),
 
+                // Product Reviews Section
+                SliverToBoxAdapter(
+                  child: ProductReviewsWidget(
+                    productId: _product!.id,
+                  ),
+                ),
+
                 // Extra space for bottom buttons
                 const SliverToBoxAdapter(
-                  child: SizedBox(height: 80),
+                  child: SizedBox(height: 100),
                 ),
               ],
             ),

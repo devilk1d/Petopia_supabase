@@ -6,7 +6,7 @@ class ReviewModel {
   final String productId;
   final String? orderId;
   final double rating;
-  final String? comment;
+  final String? comment; // This maps to review_text from database
   final List<String>? images;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -32,14 +32,14 @@ class ReviewModel {
       id: json['id'] ?? '',
       userId: json['user_id'] ?? '',
       productId: json['product_id'] ?? '',
-      orderId: json['order_id'],
+      orderId: json['order_item_id'], // Note: using order_item_id as orderId
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
-      comment: json['comment'],
+      comment: json['review_text'], // Map review_text to comment field
       images: json['images'] != null ? List<String>.from(json['images']) : null,
-      createdAt: DateTime.parse(json['created_at'] ?? ''),
+      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
       userFullName: json['users']?['full_name'],
-      userAvatar: json['users']?['avatar_url'],
+      userAvatar: json['users']?['profile_image_url'], // Updated field name
     );
   }
 
@@ -48,9 +48,9 @@ class ReviewModel {
       'id': id,
       'user_id': userId,
       'product_id': productId,
-      'order_id': orderId,
+      'order_item_id': orderId, // Use order_item_id for database
       'rating': rating,
-      'comment': comment,
+      'review_text': comment, // Map comment back to review_text
       'images': images,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
@@ -60,4 +60,4 @@ class ReviewModel {
   static List<ReviewModel> fromJsonList(List<dynamic> jsonList) {
     return jsonList.map((json) => ReviewModel.fromJson(json)).toList();
   }
-} 
+}

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../utils/colors.dart';
 import '../services/order_service.dart';
 import '../services/auth_service.dart';
+import '../services/review_service.dart';
 import 'dart:convert';
 import '../utils/datetime_utils.dart';
 
@@ -18,6 +19,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Map<String, dynamic>? _orderData;
   String? _orderId;
   String _errorMessage = '';
+
+  // Add this to track which products have been reviewed
+  Map<String, bool> _reviewedProducts = {};
+  bool _isCheckingReviews = false;
 
   @override
   void didChangeDependencies() {
@@ -77,11 +82,85 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           _orderData = safeOrderData;
           _isLoading = false;
         });
+
+        // Check review status for all products if order is delivered
+        final status = _safeGetString(_orderData?['status'], defaultValue: 'pending_payment');
+        final paymentStatus = _safeGetString(_orderData?['payment_status'], defaultValue: 'pending');
+
+        if (status == 'delivered' && paymentStatus == 'paid') {
+          await _checkReviewStatus();
+        }
       } else {
         _setError('Order tidak ditemukan');
       }
     } catch (e) {
       _setError('Gagal memuat data order: $e');
+    }
+  }
+
+  // Check review status for all products
+  Future<void> _checkReviewStatus() async {
+    if (_orderData == null) return;
+
+    setState(() {
+      _isCheckingReviews = true;
+    });
+
+    try {
+      final orderItemsRaw = _orderData?['order_items'];
+      final orderItems = _safeToListOfMaps(orderItemsRaw);
+
+      Map<String, bool> reviewStatus = {};
+
+      for (var item in orderItems) {
+        final productId = _safeGetString(item['product_id']);
+        final orderItemId = _safeGetString(item['id']);
+
+        if (productId.isNotEmpty && orderItemId.isNotEmpty) {
+          try {
+            final hasReviewed = await _hasUserReviewedProduct(productId, orderItemId);
+            reviewStatus[productId] = hasReviewed;
+          } catch (e) {
+            print('Error checking review for product $productId: $e');
+            reviewStatus[productId] = false;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _reviewedProducts = reviewStatus;
+          _isCheckingReviews = false;
+        });
+      }
+    } catch (e) {
+      print('Error checking review status: $e');
+      if (mounted) {
+        setState(() {
+          _isCheckingReviews = false;
+        });
+      }
+    }
+  }
+
+  // Check if user has reviewed a specific product
+  Future<bool> _hasUserReviewedProduct(String productId, String orderItemId) async {
+    try {
+      final userId = AuthService.currentUserId;
+      if (userId == null) return false;
+
+      final response = await ReviewService.supabase
+          .from('product_reviews')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('product_id', productId)
+          .eq('order_item_id', orderItemId)
+          .maybeSingle();
+
+      return response != null;
+    } catch (e) {
+      print('Error checking review status for product $productId: $e');
+      return false;
     }
   }
 
@@ -433,7 +512,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   _buildShippingCard(),
                   const SizedBox(height: 16),
                   _buildPaymentSummaryCard(),
-                  const SizedBox(height: 10), // Space for bottom buttons
+                  const SizedBox(height: 100), // Space for bottom buttons
                 ],
               ),
             ),
@@ -899,10 +978,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ),
                     ],
                   );
-                }).toList(),
+                }),
               ],
             );
-          }).toList(),
+          }),
           const SizedBox(height: 10),
         ],
       ),
@@ -1277,7 +1356,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.payment, size: 20, color: Colors.white,),
+                      Icon(Icons.payment, size: 20, color: Colors.white),
                       SizedBox(width: 8),
                       Text(
                         'Lanjutkan Pembayaran',
@@ -1311,7 +1390,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle,color: Colors.white, size: 20),
+                      Icon(Icons.check_circle, color: Colors.white, size: 20),
                       SizedBox(width: 8),
                       Text(
                         'Pesanan Diterima',
@@ -1327,7 +1406,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ],
 
-            // Secondary actions
+            // Secondary actions for delivered orders
             if (paymentStatus == 'paid' && status == 'delivered') ...[
               Row(
                 children: [
@@ -1361,46 +1440,83 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
+
+                  // Rating button with review check
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final result = await Navigator.pushNamed(
-                          context,
-                          '/rating',
-                          arguments: {
-                            'productId': _orderData!['order_items'][0]['product_id'],
-                            'orderId': _orderData!['order_items'][0]['id'],
-                          },
-                        );
-                        
-                        if (result == true) {
-                          // Refresh order details after successful rating
-                          _loadOrderData();
+                    child: Builder(
+                      builder: (context) {
+                        // Check if all products have been reviewed
+                        final orderItemsRaw = _orderData?['order_items'];
+                        final orderItems = _safeToListOfMaps(orderItemsRaw);
+                        bool allProductsReviewed = true;
+
+                        if (orderItems.isNotEmpty) {
+                          for (var item in orderItems) {
+                            final productId = _safeGetString(item['product_id']);
+                            if (productId.isNotEmpty &&
+                                (_reviewedProducts[productId] != true)) {
+                              allProductsReviewed = false;
+                              break;
+                            }
+                          }
                         }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black87,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.star_outline, size: 18),
-                          SizedBox(width: 6),
-                          Text(
-                            'Beri Rating',
-                            style: TextStyle(
-                              fontFamily: 'SF Pro Display',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+
+                        return ElevatedButton(
+                          onPressed: allProductsReviewed || _isCheckingReviews
+                              ? null
+                              : () async {
+                            final result = await Navigator.pushNamed(
+                              context,
+                              '/rating',
+                              arguments: {
+                                'productId': _orderData!['order_items'][0]['product_id'],
+                                'orderId': _orderData!['order_items'][0]['id'],
+                              },
+                            );
+
+                            if (result == true) {
+                              _loadOrderData(); // Refresh to update review status
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: allProductsReviewed
+                                ? Colors.grey[400]
+                                : Colors.black87,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                        ],
-                      ),
+                          child: _isCheckingReviews
+                              ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                              : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                  allProductsReviewed ? Icons.check : Icons.star_outline,
+                                  size: 18
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                allProductsReviewed ? 'Sudah Rating' : 'Beri Rating',
+                                style: const TextStyle(
+                                  fontFamily: 'SF Pro Display',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],

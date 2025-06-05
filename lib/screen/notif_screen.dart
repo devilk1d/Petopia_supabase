@@ -5,6 +5,7 @@ import '../models/notification_model.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:intl/intl.dart';
 import '../services/auth_service.dart';
+import '../utils/timeago_setup.dart'; // Import the timeago setup
 import 'dart:async';
 
 class NotifScreen extends StatefulWidget {
@@ -27,15 +28,17 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    // Initialize timeago with Indonesian locale
-    timeago.setLocaleMessages('id', timeago.IdMessages());
-    
+    // Initialize timeago with Indonesian locale using the setup utility
+    setupTimeago();
+
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       setState(() {});
     });
     _loadNotifications();
     _setupRealtimeSubscription();
+
+    // Update timestamps every 30 seconds
     _timer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (mounted) setState(() {});
     });
@@ -56,7 +59,7 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
       });
 
       final notifications = await NotificationService.getUserNotifications();
-      
+
       if (mounted) {
         setState(() {
           _notifications = notifications;
@@ -123,6 +126,26 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
         _readPromoSystemIds.add(notification.id);
       }
     });
+  }
+
+  // Get formatted time with better Indonesian formatting
+  String _getFormattedTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    // Use custom Indonesian time formatting for better UX
+    if (difference.inMinutes < 1) {
+      return 'Baru saja';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes} menit yang lalu';
+    } else if (difference.inDays < 1) {
+      return '${difference.inHours} jam yang lalu';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} hari yang lalu';
+    } else {
+      // For older notifications, show the actual date
+      return DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(dateTime);
+    }
   }
 
   // Get icon and color based on notification type and data
@@ -203,10 +226,10 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? _buildErrorState()
-                      : _filteredNotifications.isEmpty
-                          ? _buildEmptyState()
-                          : _buildNotificationsList(),
+                  ? _buildErrorState()
+                  : _filteredNotifications.isEmpty
+                  ? _buildEmptyState()
+                  : _buildNotificationsList(),
             ),
           ],
         ),
@@ -255,24 +278,24 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
           // Mark all as read button (only if there are unread notifications)
           unreadCount > 0
               ? GestureDetector(
-                  onTap: _markAllAsRead,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: const Text(
-                      'Baca Semua',
-                      style: TextStyle(
-                        fontFamily: 'SF Pro Display',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryColor,
-                      ),
-                    ),
-                  ),
-                )
+            onTap: _markAllAsRead,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: const Text(
+                'Baca Semua',
+                style: TextStyle(
+                  fontFamily: 'SF Pro Display',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryColor,
+                ),
+              ),
+            ),
+          )
               : const SizedBox(width: 40),
         ],
       ),
@@ -321,14 +344,18 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
   }
 
   Widget _buildNotificationsList() {
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredNotifications.length,
-      separatorBuilder: (context, index) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final notification = _filteredNotifications[index];
-        return _buildNotificationItem(notification);
-      },
+    return RefreshIndicator(
+      color: AppColors.primaryColor,
+      onRefresh: _loadNotifications,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: _filteredNotifications.length,
+        separatorBuilder: (context, index) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final notification = _filteredNotifications[index];
+          return _buildNotificationItem(notification);
+        },
+      ),
     );
   }
 
@@ -369,7 +396,10 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
-        color: isUnread ? const Color(0xFFF8F8FF) : Colors.white,
+        decoration: BoxDecoration(
+          color: isUnread ? const Color(0xFFF8F8FF) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -436,9 +466,9 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
 
                   const SizedBox(height: 8),
 
-                  // Time ago
+                  // Time ago with better formatting
                   Text(
-                    timeago.format(notification.createdAt, locale: 'id'),
+                    _getFormattedTime(notification.createdAt),
                     style: TextStyle(
                       fontFamily: 'SF Pro Display',
                       fontSize: 12,
@@ -455,6 +485,25 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
   }
 
   Widget _buildEmptyState() {
+    String emptyMessage = 'Tidak ada notifikasi';
+    String emptySubtitle = 'Notifikasi Anda akan muncul di sini';
+
+    // Customize message based on selected tab
+    switch (_tabController.index) {
+      case 1:
+        emptyMessage = 'Tidak ada notifikasi transaksi';
+        emptySubtitle = 'Notifikasi terkait pesanan akan muncul di sini';
+        break;
+      case 2:
+        emptyMessage = 'Tidak ada notifikasi promo';
+        emptySubtitle = 'Penawaran dan promo menarik akan muncul di sini';
+        break;
+      case 3:
+        emptyMessage = 'Tidak ada notifikasi sistem';
+        emptySubtitle = 'Pembaruan sistem akan muncul di sini';
+        break;
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -466,7 +515,7 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
           ),
           const SizedBox(height: 16),
           Text(
-            'Tidak ada notifikasi',
+            emptyMessage,
             style: TextStyle(
               fontFamily: 'SF Pro Display',
               fontSize: 18,
@@ -476,7 +525,7 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
           ),
           const SizedBox(height: 8),
           Text(
-            'Notifikasi Anda akan muncul di sini',
+            emptySubtitle,
             style: TextStyle(
               fontFamily: 'SF Pro Display',
               fontSize: 14,
