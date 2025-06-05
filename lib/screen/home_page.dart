@@ -15,6 +15,7 @@ import '../models/product_model.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
 import '../utils/format.dart';
+import '../services/notification_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -28,6 +29,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   late PageController _bannerController;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  int _notificationCount = 0;
+  StreamSubscription? _notificationCountSubscription;
 
   // Data states
   List<CategoryModel> _categories = [];
@@ -75,6 +78,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     // Setup real-time subscriptions
     _setupRealTimeSubscriptions();
 
+    _subscribeToNotificationCount();
+
     // Setup timer to auto-scroll banner
     Future.delayed(Duration.zero, () {
       _autoScrollBanner();
@@ -93,8 +98,46 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _categoriesSubscription?.cancel();
     _promosSubscription?.cancel();
     _wishlistSubscription?.cancel();
+    _notificationCountSubscription?.cancel();
 
     super.dispose();
+  }
+
+  void _subscribeToNotificationCount() {
+    if (!_isLoggedIn) return;
+
+    try {
+      _notificationCountSubscription = NotificationService.subscribeToUnreadCount().listen(
+            (count) {
+          if (mounted) {
+            setState(() {
+              _notificationCount = count;
+            });
+          }
+        },
+        onError: (error) {
+          print('Error in notification count subscription: $error');
+        },
+      );
+    } catch (e) {
+      print('Error setting up notification count subscription: $e');
+    }
+  }
+
+// Tambahkan method untuk load notification count
+  Future<void> _loadNotificationCount() async {
+    if (!_isLoggedIn) return;
+
+    try {
+      final count = await NotificationService.getUnreadCount();
+      if (mounted) {
+        setState(() {
+          _notificationCount = count;
+        });
+      }
+    } catch (e) {
+      print('Error loading notification count: $e');
+    }
   }
 
   void _setupRealTimeSubscriptions() {
@@ -102,6 +145,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     if (_isLoggedIn) {
       _subscribeToUserProfile();
       _subscribeToWishlistChanges();
+      _subscribeToNotificationCount();
     }
 
     // Subscribe to products changes
@@ -310,6 +354,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         _loadProducts(),
         if (_isLoggedIn) _loadUserData(),
         if (_isLoggedIn) _loadWishlistStatus(),
+        if (_isLoggedIn) _loadNotificationCount(),
       ];
 
       // Wait for all to complete, but don't fail if one fails
@@ -643,26 +688,56 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       ),
 
                       // Notification icon with badge
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: AppColors.greyColor,
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.notifications_outlined,
-                            color: AppColors.primaryColor,
+                      Stack(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: AppColors.greyColor,
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.notifications_outlined,
+                                color: AppColors.primaryColor,
+                              ),
+                              onPressed: () {
+                                if (_isLoggedIn) {
+                                  Navigator.pushNamed(context, '/notif');
+                                } else {
+                                  Navigator.pushNamed(context, '/login');
+                                }
+                              },
+                            ),
                           ),
-                          onPressed: () {
-                            if (_isLoggedIn) {
-                              Navigator.pushNamed(context, '/notif');
-                            } else {
-                              Navigator.pushNamed(context, '/login');
-                            }
-                          },
-                        ),
+                          if (_isLoggedIn && _notificationCount > 0)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 18,
+                                  minHeight: 18,
+                                ),
+                                child: Text(
+                                  _notificationCount > 99 ? '99+' : '$_notificationCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
