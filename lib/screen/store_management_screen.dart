@@ -1460,55 +1460,71 @@ class _StoreManagementScreenState extends State<StoreManagementScreen>
   }
 
   void _showAddProductDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => ProductForm(
-        storeId: _storeData!['id'],
-        onSuccess: () {
-          _loadStoreData();
-          _showSnackBar('Produk berhasil ditambahkan');
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductForm(
+          storeId: _storeData!['id'],
+          onSuccess: () {
+            _loadStoreData();
+            _showSnackBar('Produk berhasil ditambahkan');
+            Navigator.pop(context);
+          },
+        ),
+        fullscreenDialog: true,
       ),
     );
   }
 
   void _showEditProductDialog(Map<String, dynamic> product) {
-    showDialog(
-      context: context,
-      builder: (context) => ProductForm(
-        product: product,
-        storeId: _storeData!['id'],
-        onSuccess: () {
-          _loadStoreData();
-          _showSnackBar('Produk berhasil diperbarui');
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductForm(
+          product: product,
+          storeId: _storeData!['id'],
+          onSuccess: () {
+            _loadStoreData();
+            _showSnackBar('Produk berhasil diperbarui');
+            Navigator.pop(context);
+          },
+        ),
+        fullscreenDialog: true,
       ),
     );
   }
 
   void _showAddPromoDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => PromoForm(
-        storeId: _storeData!['id'],
-        onSuccess: () {
-          _loadStoreData();
-          _showSnackBar('Promo berhasil ditambahkan');
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PromoForm(
+          storeId: _storeData!['id'],
+          onSuccess: () {
+            _loadStoreData();
+            _showSnackBar('Promo berhasil ditambahkan');
+            Navigator.pop(context);
+          },
+        ),
+        fullscreenDialog: true,
       ),
     );
   }
 
   void _showEditPromoDialog(Map<String, dynamic> promo) {
-    showDialog(
-      context: context,
-      builder: (context) => PromoForm(
-        promo: promo,
-        storeId: _storeData!['id'],
-        onSuccess: () {
-          _loadStoreData();
-          _showSnackBar('Promo berhasil diperbarui');
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PromoForm(
+          promo: promo,
+          storeId: _storeData!['id'],
+          onSuccess: () {
+            _loadStoreData();
+            _showSnackBar('Promo berhasil diperbarui');
+            Navigator.pop(context);
+          },
+        ),
+        fullscreenDialog: true,
       ),
     );
   }
