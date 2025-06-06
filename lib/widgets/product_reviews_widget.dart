@@ -791,9 +791,11 @@ class _ProductReviewsWidgetState extends State<ProductReviewsWidget> {
       context: context,
       builder: (BuildContext context) {
         return Dialog(
-          backgroundColor: Colors.black,
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(20),
           child: Stack(
             children: [
+              // Gambar
               PageView.builder(
                 itemCount: images.length,
                 controller: PageController(initialPage: initialIndex),
@@ -805,7 +807,7 @@ class _ProductReviewsWidgetState extends State<ProductReviewsWidget> {
                       errorBuilder: (_, __, ___) => const Center(
                         child: Icon(
                           Icons.image_not_supported_outlined,
-                          color: Colors.white,
+                          color: Colors.grey,
                           size: 64,
                         ),
                       ),
@@ -813,20 +815,28 @@ class _ProductReviewsWidgetState extends State<ProductReviewsWidget> {
                   );
                 },
               ),
+              // Close button di pojok kanan atas gambar
               Positioned(
-                top: 40,
-                right: 20,
+                top: 0,
+                right: 0,
                 child: GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: const BoxDecoration(
-                      color: Colors.black54,
+                      color: Colors.white,
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: const Icon(
                       Icons.close,
-                      color: Colors.white,
+                      color: Colors.black,
                       size: 24,
                     ),
                   ),
