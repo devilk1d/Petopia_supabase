@@ -200,31 +200,91 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
     }
   }
 
-  IconData _getNotificationIcon(String type) {
-    switch (type) {
+  // Enhanced function to get specific icons based on notification content
+  IconData _getNotificationIcon(NotificationModel notification) {
+    switch (notification.type) {
       case 'order':
-        return Icons.shopping_bag_outlined;
+      // Get specific icon based on order status from title or message
+        final title = notification.title.toLowerCase();
+        final message = notification.message.toLowerCase();
+
+        if (title.contains('pembayaran berhasil') || message.contains('pembayaran') && message.contains('berhasil')) {
+          return Icons.check_circle_outline; // Payment success
+        } else if (title.contains('pesanan tiba') || title.contains('pesanan diterima') || message.contains('telah tiba')) {
+          return Icons.home_outlined; // Package delivered
+        } else if (title.contains('pesanan dikirim') || title.contains('dalam perjalanan') || message.contains('dalam perjalanan')) {
+          return Icons.local_shipping_outlined; // In transit
+        } else if (title.contains('pesanan diproses') || message.contains('diproses')) {
+          return Icons.settings_outlined; // Processing
+        } else if (title.contains('pembayaran gagal') || message.contains('pembayaran') && message.contains('gagal')) {
+          return Icons.error_outline; // Payment failed
+        } else if (title.contains('dibatalkan') || message.contains('dibatalkan')) {
+          return Icons.cancel_outlined; // Cancelled
+        } else if (title.contains('menunggu pembayaran') || message.contains('menunggu pembayaran')) {
+          return Icons.payment_outlined; // Waiting payment
+        } else {
+          return Icons.shopping_bag_outlined; // Default order icon
+        }
+
       case 'article':
         return Icons.article_outlined;
+
       case 'promo':
         return Icons.local_offer_outlined;
+
       case 'system':
-        return Icons.info_outlined;
+        final title = notification.title.toLowerCase();
+        if (title.contains('selamat datang') || title.contains('welcome')) {
+          return Icons.celebration_outlined; // Welcome
+        } else {
+          return Icons.info_outline; // Default system
+        }
+
       default:
         return Icons.notifications_outlined;
     }
   }
 
-  Color _getNotificationColor(String type) {
-    switch (type) {
+  // Enhanced function to get specific colors based on notification content
+  Color _getNotificationColor(NotificationModel notification) {
+    switch (notification.type) {
       case 'order':
-        return AppColors.primaryColor;
+      // Get specific color based on order status from title or message
+        final title = notification.title.toLowerCase();
+        final message = notification.message.toLowerCase();
+
+        if (title.contains('pembayaran berhasil') || message.contains('pembayaran') && message.contains('berhasil')) {
+          return const Color(0xFF4CAF50); // Green for success
+        } else if (title.contains('pesanan tiba') || title.contains('pesanan diterima') || message.contains('telah tiba')) {
+          return const Color(0xFF2E7D32); // Dark green for delivered
+        } else if (title.contains('pesanan dikirim') || title.contains('dalam perjalanan') || message.contains('dalam perjalanan')) {
+          return const Color(0xFF1976D2); // Blue for shipping
+        } else if (title.contains('pesanan diproses') || message.contains('diproses')) {
+          return const Color(0xFFFF9800); // Orange for processing
+        } else if (title.contains('pembayaran gagal') || message.contains('pembayaran') && message.contains('gagal')) {
+          return const Color(0xFFE53935); // Red for failed
+        } else if (title.contains('dibatalkan') || message.contains('dibatalkan')) {
+          return const Color(0xFF757575); // Grey for cancelled
+        } else if (title.contains('menunggu pembayaran') || message.contains('menunggu pembayaran')) {
+          return const Color(0xFFFFB74D); // Light orange for waiting payment
+        } else {
+          return AppColors.primaryColor; // Default pink
+        }
+
       case 'article':
-        return AppColors.info;
+        return const Color(0xFF2196F3); // Blue for articles
+
       case 'promo':
-        return AppColors.warning;
+        return const Color(0xFFFF5722); // Orange-red for promos
+
       case 'system':
-        return AppColors.success;
+        final title = notification.title.toLowerCase();
+        if (title.contains('selamat datang') || title.contains('welcome')) {
+          return const Color(0xFF9C27B0); // Purple for welcome
+        } else {
+          return const Color(0xFF607D8B); // Blue grey for system
+        }
+
       default:
         return Colors.grey;
     }
@@ -415,6 +475,8 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
               itemCount: filteredNotifications.length,
               itemBuilder: (context, index) {
                 final notification = filteredNotifications[index];
+                final notificationIcon = _getNotificationIcon(notification);
+                final notificationColor = _getNotificationColor(notification);
 
                 return Dismissible(
                   key: Key(notification.id),
@@ -440,12 +502,12 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
                     decoration: BoxDecoration(
                       color: notification.isRead
                           ? Colors.white
-                          : AppColors.primaryColor.withOpacity(0.05),
+                          : notificationColor.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: notification.isRead
                             ? Colors.grey.withOpacity(0.2)
-                            : AppColors.primaryColor.withOpacity(0.2),
+                            : notificationColor.withOpacity(0.2),
                       ),
                       boxShadow: [
                         BoxShadow(
@@ -465,13 +527,12 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: _getNotificationColor(notification.type)
-                              .withOpacity(0.1),
+                          color: notificationColor.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Icon(
-                          _getNotificationIcon(notification.type),
-                          color: _getNotificationColor(notification.type),
+                          notificationIcon,
+                          color: notificationColor,
                           size: 20,
                         ),
                       ),
@@ -495,8 +556,8 @@ class _NotifScreenState extends State<NotifScreen> with SingleTickerProviderStat
                             Container(
                               width: 8,
                               height: 8,
-                              decoration: const BoxDecoration(
-                                color: AppColors.primaryColor,
+                              decoration: BoxDecoration(
+                                color: notificationColor,
                                 shape: BoxShape.circle,
                               ),
                             ),

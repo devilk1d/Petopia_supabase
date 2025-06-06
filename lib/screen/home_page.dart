@@ -16,6 +16,7 @@ import '../services/auth_service.dart';
 import '../services/user_service.dart';
 import '../utils/format.dart';
 import '../services/notification_service.dart';
+import 'search_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -307,7 +308,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   void _handlePromosUpdate(List<Map<String, dynamic>> data) {
     try {
-      print('Promos updated via real-time: [38;5;2m${data.length} items[0m');
+      print('Promos updated via real-time: [38;5;2m${data.length} items[0m');
       final updatedPromos = data.map((json) => PromoModel.fromJson(json)).toList();
       setState(() {
         _promos = updatedPromos;
@@ -570,6 +571,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
+  // Navigate to search screen
+  void _navigateToSearch() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const SearchScreen(),
+      ),
+    );
+  }
+
   // Handle refresh manually
   Future<void> _handleRefresh() async {
     print('Manual refresh triggered');
@@ -750,8 +760,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
                   child: Row(
                     children: [
-                      const Expanded(
-                        child: CustomSearchBar(),
+                      Expanded(
+                        child: CustomSearchBar(
+                          enabled: false, // Non-functional, just for display
+                          onTap: _navigateToSearch, // Navigate to search screen
+                        ),
                       ),
                       const SizedBox(width: 12),
                       // Promo button

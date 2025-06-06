@@ -3,6 +3,7 @@ import '../utils/colors.dart';
 import '../services/transaction_service.dart';
 import '../services/auth_service.dart';
 import '../utils/datetime_utils.dart';
+import '../widgets/search_bar.dart';
 
 class TransactionScreen extends StatefulWidget {
   const TransactionScreen({Key? key}) : super(key: key);
@@ -17,6 +18,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
   List<Map<String, dynamic>> _transactions = [];
+  List<Map<String, dynamic>> _filteredTransactions = [];
   String _searchQuery = '';
 
   @override
@@ -35,35 +37,32 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
   void _onSearchChanged() {
     setState(() {
-      _searchQuery = _searchController.text;
+      _searchQuery = _searchController.text.toLowerCase();
     });
-    _searchTransactions();
+    _filterTransactions();
   }
 
-  Future<void> _searchTransactions() async {
+  void _filterTransactions() {
     if (_searchQuery.isEmpty) {
-      _loadTransactions();
+      setState(() {
+        _filteredTransactions = List.from(_transactions);
+      });
       return;
     }
 
-    try {
-      final results = await TransactionService.searchTransactions(_searchQuery);
-      if (mounted) {
-        setState(() {
-          _transactions = results;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gagal mencari transaksi'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    final filtered = _transactions.where((transaction) {
+      final invoiceNumber = transaction['invoiceNumber']?.toString().toLowerCase() ?? '';
+      final productName = transaction['productName']?.toString().toLowerCase() ?? '';
+      final storeName = transaction['storeName']?.toString().toLowerCase() ?? '';
+
+      return invoiceNumber.contains(_searchQuery) ||
+          productName.contains(_searchQuery) ||
+          storeName.contains(_searchQuery);
+    }).toList();
+
+    setState(() {
+      _filteredTransactions = filtered;
+    });
   }
 
   Future<void> _loadTransactions() async {
@@ -95,8 +94,14 @@ class _TransactionScreenState extends State<TransactionScreen> {
       if (mounted) {
         setState(() {
           _transactions = transactions;
+          _filteredTransactions = List.from(transactions);
           _isLoading = false;
         });
+
+        // Apply current search filter if any
+        if (_searchQuery.isNotEmpty) {
+          _filterTransactions();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -111,6 +116,14 @@ class _TransactionScreenState extends State<TransactionScreen> {
         );
       }
     }
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+      _filteredTransactions = List.from(_transactions);
+    });
   }
 
   @override
@@ -134,8 +147,8 @@ class _TransactionScreenState extends State<TransactionScreen> {
             _buildSearchAndTabs(),
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _transactions.isEmpty
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primaryColor))
+                  : _filteredTransactions.isEmpty
                   ? _buildEmptyState()
                   : _buildTransactionList(),
             ),
@@ -220,28 +233,57 @@ class _TransactionScreenState extends State<TransactionScreen> {
         // Search Bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Container(
-            height: 50,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF6F6F6),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Cari transaksi...',
-                hintStyle: TextStyle(
-                  fontFamily: 'SF Pro Display',
-                  fontSize: 14,
-                  color: Colors.grey.shade500,
-                ),
-                prefixIcon: Icon(Icons.search, color: Colors.grey.shade500),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 15),
-              ),
-            ),
+          child: CustomSearchBar(
+            controller: _searchController,
+            hintText: 'Cari transaksi...',
+            enabled: true,
+            onChanged: (value) {
+              // Real-time search handled by listener
+            },
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+              icon: const Icon(Icons.clear, color: Colors.grey),
+              onPressed: _clearSearch,
+            )
+                : const Icon(Icons.search, color: Colors.grey),
           ),
         ),
+
+        // Search results info
+        if (_searchQuery.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+            child: Row(
+              children: [
+                Text(
+                  'Hasil pencarian untuk "$_searchQuery" (${_filteredTransactions.length} transaksi)',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const Spacer(),
+                if (_filteredTransactions.length != _transactions.length)
+                  TextButton(
+                    onPressed: _clearSearch,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Clear',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro Display',
+                        fontSize: 12,
+                        color: AppColors.primaryColor,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
 
         // Tab Bar
         Container(
@@ -296,11 +338,12 @@ class _TransactionScreenState extends State<TransactionScreen> {
   Widget _buildTransactionList() {
     return RefreshIndicator(
       onRefresh: _loadTransactions,
+      color: AppColors.primaryColor,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-        itemCount: _transactions.length,
+        itemCount: _filteredTransactions.length,
         itemBuilder: (context, index) {
-          return _buildTransactionCard(_transactions[index]);
+          return _buildTransactionCard(_filteredTransactions[index]);
         },
       ),
     );
@@ -608,19 +651,30 @@ class _TransactionScreenState extends State<TransactionScreen> {
   }
 
   Widget _buildEmptyState() {
+    String emptyMessage;
+    String emptyDescription;
+
+    if (_searchQuery.isNotEmpty) {
+      emptyMessage = 'Tidak Ada Hasil';
+      emptyDescription = 'Tidak ditemukan transaksi dengan pencarian "$_searchQuery"';
+    } else {
+      emptyMessage = 'Belum Ada Transaksi';
+      emptyDescription = 'Mulai belanja untuk melihat riwayat transaksi';
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.receipt_long_outlined,
+          Icon(
+            _searchQuery.isNotEmpty ? Icons.search_off : Icons.receipt_long_outlined,
             size: 64,
             color: Colors.grey,
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Belum Ada Transaksi',
-            style: TextStyle(
+          Text(
+            emptyMessage,
+            style: const TextStyle(
               fontFamily: 'SF Pro Display',
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -628,33 +682,55 @@ class _TransactionScreenState extends State<TransactionScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Mulai belanja untuk melihat riwayat transaksi',
+            emptyDescription,
             style: TextStyle(
               fontFamily: 'SF Pro Display',
               fontSize: 14,
               color: Colors.grey.shade600,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () => Navigator.pushNamed(context, '/home'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          if (_searchQuery.isNotEmpty)
+            ElevatedButton(
+              onPressed: _clearSearch,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Hapus Pencarian',
+                style: TextStyle(
+                  fontFamily: 'SF Pro Display',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            )
+          else
+            ElevatedButton(
+              onPressed: () => Navigator.pushNamed(context, '/home'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Mulai Belanja',
+                style: TextStyle(
+                  fontFamily: 'SF Pro Display',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
             ),
-            child: const Text(
-              'Mulai Belanja',
-              style: TextStyle(
-                fontFamily: 'SF Pro Display',
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
         ],
       ),
     );

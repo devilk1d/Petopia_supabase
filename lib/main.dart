@@ -22,6 +22,7 @@ import 'screen/toko_profile.dart';
 import 'screen/daftar_alamat_screen.dart';
 import 'screen/data_alamat_screen.dart';
 import 'screen/article_detail_screen.dart';
+import 'screen/search_screen.dart'; // Import search screen
 import 'widgets/bottom_nav_bar.dart';
 import 'screen/register_toko.dart';
 import 'screen/complaint_screen.dart';
@@ -69,6 +70,12 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/home': (context) => const HomePageWrapper(),
+        '/search': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          return SearchScreen(
+            initialQuery: args?['query'] as String?,
+          );
+        },
         '/product-detail': (context) => const ProductDetailPage(),
         '/cart': (context) => const CartScreen(),
         '/checkout': (context) {
