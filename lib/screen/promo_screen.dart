@@ -1,27 +1,56 @@
 import 'package:flutter/material.dart';
 import '../widgets/promo_card.dart';
+import '../services/promo_service.dart';
+import '../models/promo_model.dart';
 
-class PromosOffersScreen extends StatelessWidget {
+class PromosOffersScreen extends StatefulWidget {
   const PromosOffersScreen({Key? key}) : super(key: key);
 
   @override
+  State<PromosOffersScreen> createState() => _PromosOffersScreenState();
+}
+
+class _PromosOffersScreenState extends State<PromosOffersScreen> {
+  List<PromoModel> promos = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadPromos();
+  }
+
+  Future<void> loadPromos() async {
+    final result = await PromoService.getActivePromos();
+    setState(() {
+      promos = result;
+      isLoading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final List<Color> backgroundColors = [
+      Color(0xFFFF5D39),
+      Color(0xFFFF7043),
+      Color(0xFFFF8A65),
+      Color(0xFFFFA726),
+      Color(0xFFFFCA28),
+      Color(0xFFFFD54F),
+      Color(0xFFFFB74D),
+    ];
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with back button and title in the same row
             Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: Row(
                 children: [
-                  // Back button
                   GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pop();
-                    },
+                    onTap: () => Navigator.of(context).pop(),
                     child: Container(
                       width: 45,
                       height: 45,
@@ -29,128 +58,56 @@ class PromosOffersScreen extends StatelessWidget {
                         color: const Color(0xFFECECEC),
                         borderRadius: BorderRadius.circular(9999),
                       ),
-                      child: Center(
-                        child: Image.asset(
-                          'assets/images/icons/black_back_icon.png',
-                          width: 24,
-                          height: 24,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+                      child: const Icon(Icons.arrow_back, color: Colors.black),
                     ),
                   ),
-                  // Title centered relative to the remaining space
-                  const Expanded(
-                    child: Center(
-                      child: Text(
-                        'Promos & Offers',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'SF Pro Display',
-                        ),
-                      ),
+                  const Spacer(),
+                  const Text(
+                    'Promos & Offers',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'SF Pro Display',
                     ),
                   ),
-                  const SizedBox(width: 45),
+                  const Spacer(flex: 2),
                 ],
               ),
             ),
-            // Scrollable list of promo cards
-            const Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(top: 40, left: 16, right: 16),
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      PromoCard(
-                        backgroundColor: Color(0xFFFF5D39),
-                        discountPercentage: '25%',
-                        promoCode: 'ST-V2587',
-                        promoCodeColor: Color(0xFFFF5E3A),
-                        discountIcon: 'assets/images/icons/discount.png',
-                        vectorBackground: 'assets/images/icons/vector5.png',
-                        // Customize icon independently
-                        iconWidth: 190,
-                        iconHeight: 259,
-                        iconPosition: Offset(-20, -27),
-                        iconOpacity: 1,
-                      ),
-                      SizedBox(height: 16),
-                      PromoCard(
-                        backgroundColor: Color(0xFF121C22),
-                        discountPercentage: '40%',
-                        promoCode: 'HS-23908',
-                        promoCodeColor: Color(0xFF121C22),
-                        discountIcon: 'assets/images/icons/kupon2.png',
-                        vectorBackground: 'assets/images/icons/vector5.png',
-                        // Customize icon independently
-                        iconWidth: 178,
-                        iconHeight: 200,
-                        iconPosition: Offset(-3, -20),
-                        iconOpacity: 1,
-                      ),
-                      SizedBox(height: 16),
-                      PromoCard(
-                        backgroundColor: Color(0xFF15326A),
-                        discountPercentage: '15%',
-                        promoCode: 'PP-34JFO',
-                        promoCodeColor: Color(0xFF15326A),
-                        discountIcon: 'assets/images/icons/discount.png',
-                        vectorBackground: 'assets/images/icons/vector5.png',
-                        // Customize icon independently
-                        iconWidth: 190,
-                        iconHeight: 259,
-                        iconPosition: Offset(-20, -27),
-                        iconOpacity: 1,
-                      ),
-                      SizedBox(height: 16),
-                      PromoCard(
-                        backgroundColor: Color(0xFF176B28),
-                        discountPercentage: '5%',
-                        promoCode: 'VM-LSDF0',
-                        promoCodeColor: Color(0xFF176B28),
-                        discountIcon: 'assets/images/icons/kupon2.png',
-                        vectorBackground: 'assets/images/icons/vector5.png',
-                        // Customize icon independently
-                        iconWidth: 178,
-                        iconHeight: 200,
-                        iconPosition: Offset(-3, -20),
-                        iconOpacity: 1,
-                      ),
-                      SizedBox(height: 16),
-                      PromoCard(
-                        backgroundColor: Color(0xFF10332C),
-                        discountPercentage: '65%',
-                        promoCode: 'IS-MKF99',
-                        promoCodeColor: Color(0xFF10332C),
-                        discountIcon: 'assets/images/icons/discount.png',
-                        vectorBackground: 'assets/images/icons/vector5.png',
-                        // Customize icon independently
-                        iconWidth: 190,
-                        iconHeight: 259,
-                        iconPosition: Offset(-20, -27),
-                        iconOpacity: 1,
-                      ),
-                      SizedBox(height: 16),
-                      PromoCard(
-                        backgroundColor: Color(0xFFB60051),
-                        discountPercentage: '25%',
-                        promoCode: 'LK-KS090',
-                        promoCodeColor: Color(0xFFB60051),
-                        discountIcon: 'assets/images/icons/kupon2.png',
-                        vectorBackground: 'assets/images/icons/vector5.png',
-                        // Customize icon independently
-                        iconWidth: 178,
-                        iconHeight: 200,
-                        iconPosition: Offset(-3, -20),
-                        iconOpacity: 1,
-                      ),
-                      SizedBox(height: 20), // Bottom padding
-                    ],
-                  ),
-                ),
-              ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      itemCount: promos.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 20),
+                      itemBuilder: (context, index) {
+                        final promo = promos[index];
+                        final color = backgroundColors[index % backgroundColors.length];
+
+                        // Format teks diskon
+                        String discountText = '';
+                        if (promo.discountType.toLowerCase() == 'percentage') {
+                          discountText = 'Up to ${promo.discountValue.toStringAsFixed(0)}% OFF';
+                        } else if (promo.discountType.toLowerCase() == 'nominal') {
+                          discountText = 'Up to Rp ${promo.discountValue.toStringAsFixed(0)} OFF';
+                        }
+
+                        return PromoCard(
+                          backgroundColor: color,
+                          discountPercentage: discountText,
+                          promoCode: promo.code,
+                          promoCodeColor: Colors.black,
+                          discountIcon: 'assets/images/icons/discount.png',
+                          vectorBackground: 'assets/images/icons/vector5.png',
+                          iconWidth: 190,
+                          iconHeight: 259,
+                          iconPosition: const Offset(-20, -27),
+                          iconOpacity: 1,
+                        );
+                      },
+                    ),
             ),
           ],
         ),
