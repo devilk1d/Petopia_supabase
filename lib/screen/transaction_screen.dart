@@ -14,7 +14,7 @@ class TransactionScreen extends StatefulWidget {
 
 class _TransactionScreenState extends State<TransactionScreen> {
   int _selectedTabIndex = 0;
-  final List<String> _tabTitles = ['Semua', 'Pending', 'Berlangsung', 'Selesai'];
+  final List<String> _tabTitles = ['Semua', 'Pending', 'Berlangsung', 'Selesai', 'Dibatalkan'];
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
   List<Map<String, dynamic>> _transactions = [];
@@ -84,6 +84,9 @@ class _TransactionScreenState extends State<TransactionScreen> {
           break;
         case 3: // Selesai
           transactions = await TransactionService.getTransactionsByStatus('COMPLETED');
+          break;
+        case 4: // Dibatalkan
+          transactions = await TransactionService.getTransactionsByStatus('CANCELLED');
           break;
         case 0: // Semua
         default:
@@ -393,7 +396,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
         break;
       case 'FAILED':
         statusColor = AppColors.error;
-        statusText = 'Gagal';
+        statusText = 'Dibatalkan';
         break;
       case 'PENDING':
         statusColor = AppColors.warning;

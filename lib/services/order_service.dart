@@ -117,6 +117,7 @@ class OrderService {
 
       // Remove only the ordered items from cart
       for (var cartItem in selectedItems) {
+        print('Attempting to remove item from cart with ID: ${cartItem['id']}');
         await CartService.removeFromCart(cartItem['id']);
       }
 
@@ -596,6 +597,68 @@ class OrderService {
         'delivered': 0,
         'cancelled': 0,
       };
+    }
+  }
+
+  // Cancel order
+  static Future<void> cancelOrder(String orderId) async {
+    try {
+      final userId = AuthService.getCurrentUserId();
+      if (userId == null) throw Exception('User not logged in');
+
+      // Fetch order details to get order items for stock return
+      final order = await _client
+          .from('orders')
+          .select('*, order_items(*)')
+          .eq('id', orderId)
+          .eq('user_id', userId)
+          .single();
+
+      if (order == null) {
+        throw Exception('Order not found or not authorized');
+      }
+
+      // Check if order can be cancelled (e.g., only pending_payment or processing)
+      final currentStatus = order['status'] as String;
+      if (currentStatus != 'pending_payment' && currentStatus != 'processing') {
+        throw Exception('Order can only be cancelled if status is pending payment or processing.');
+      }
+
+      // Update order status to cancelled
+      await _client
+          .from('orders')
+          .update({
+            'status': 'cancelled',
+            'payment_status': 'failed',
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', orderId);
+
+      print('Attempting to update order $orderId to status: cancelled, payment_status: failed');
+
+      // Return product stock for each item in the cancelled order
+      final orderItems = (order['order_items'] as List<dynamic>)
+          .map((item) => item as Map<String, dynamic>)
+          .toList();
+
+      for (var item in orderItems) {
+        final productId = item['product_id'] as String;
+        final quantity = item['quantity'] as int;
+        final variant = item['variant'] as String?;
+
+        // Increase product stock (reverse the update made during order creation)
+        await ProductService.updateProductStock(
+          productId,
+          -quantity, // Subtracting a negative quantity means adding stock back
+          variant: variant,
+        );
+      }
+
+      print('Order $orderId cancelled and stock returned successfully.');
+
+    } catch (e) {
+      print('Error cancelling order: $e');
+      throw Exception('Failed to cancel order: $e');
     }
   }
 }

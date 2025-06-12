@@ -30,6 +30,7 @@ import 'screen/notif_screen.dart';
 import 'screen/category_product_screen.dart';
 import 'services/supabase_config.dart';
 import 'models/address_model.dart';
+import 'screen/store_page.dart';
 
 void main() async {
   // Ensure Flutter is initialized
@@ -108,6 +109,10 @@ class MyApp extends StatelessWidget {
         '/complaint': (context) => const ComplaintScreen(),
         '/notif': (context) => const NotifScreen(),
         '/category-products': (context) => const CategoryProductsPage(),
+        '/store': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return StorePage(storeId: args['storeId']);
+        },
       },
     );
   }

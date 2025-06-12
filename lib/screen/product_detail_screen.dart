@@ -834,71 +834,79 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
   }
 
   Widget _buildStoreInfo() {
-    return Row(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(15),
-          child: Image.network(
-            _product!.sellerStoreImage ?? 'assets/images/icons/store_placeholder.png',
-            width: 30,
-            height: 30,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).pushNamed(
+          '/store',
+          arguments: {'storeId': _product!.sellerId},
+        );
+      },
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: Image.network(
+              _product!.sellerStoreImage ?? 'assets/images/icons/store_placeholder.png',
               width: 30,
               height: 30,
-              color: Colors.grey[200],
-              child: const Icon(
-                Icons.store,
-                size: 16,
-                color: Colors.grey,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 30,
+                height: 30,
+                color: Colors.grey[200],
+                child: const Icon(
+                  Icons.store,
+                  size: 16,
+                  color: Colors.grey,
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          _product!.sellerStoreName ?? 'Unknown Store',
-          style: const TextStyle(
-            fontFamily: 'SF Pro Display',
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
+          const SizedBox(width: 8),
+          Text(
+            _product!.sellerStoreName ?? 'Unknown Store',
+            style: const TextStyle(
+              fontFamily: 'SF Pro Display',
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
           ),
-        ),
-        const SizedBox(width: 4),
-        const Icon(
-          Icons.verified,
-          size: 16,
-          color: Colors.blue,
-        ),
-        const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(20),
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.verified,
+            size: 16,
+            color: Colors.blue,
           ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.star,
-                size: 14,
-                color: Color(0xFFFFA000),
-              ),
-              const SizedBox(width: 2),
-              Text(
-                _product!.rating.toStringAsFixed(1),
-                style: const TextStyle(
-                  fontFamily: 'SF Pro Display',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.star,
+                  size: 14,
+                  color: Color(0xFFFFA000),
                 ),
-              ),
-            ],
+                const SizedBox(width: 2),
+                Text(
+                  _product!.rating.toStringAsFixed(1),
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

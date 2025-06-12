@@ -119,7 +119,7 @@ class NotificationService {
         title = 'Pesanan Tiba';
         message = 'Pesanan $orderNumber telah tiba di alamat Anda.';
       } else if (paymentStatus == 'failed') {
-        title = 'Pembayaran Gagal';
+        title = 'Pembayaran Dibatalkan';
         message = 'Pembayaran untuk pesanan $orderNumber gagal. Silakan coba lagi.';
       } else if (status == 'cancelled') {
         title = 'Pesanan Dibatalkan';

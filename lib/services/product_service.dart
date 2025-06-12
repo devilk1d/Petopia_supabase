@@ -581,7 +581,11 @@ class ProductService {
 
       // Handle variant stock
       if (variant != null && product['variants'] != null) {
-        final variants = product['variants'] as Map<String, dynamic>;
+        // Debugging: Print the actual type of product['variants']
+        print('Type of product[\'variants\']: ${product['variants'].runtimeType}');
+        // Ensure variants is treated as a Map<String, dynamic>
+        final variants = Map<String, dynamic>.from(product['variants']);
+
         if (variants.containsKey('name') && variants.containsKey('price')) {
           final variantNames = variants['name'] as List;
           final variantIndex = variantNames.indexOf(variant);

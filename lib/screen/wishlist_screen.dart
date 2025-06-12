@@ -429,11 +429,26 @@ class _WishlistScreenState extends State<WishlistScreen> {
                           color: AppColors.primaryColor.withOpacity(0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
-                          Icons.store,
-                          size: 12,
-                          color: AppColors.primaryColor,
-                        ),
+                        child: product.sellerStoreImage != null && product.sellerStoreImage!.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.network(
+                                  product.sellerStoreImage!,
+                                  width: 20,
+                                  height: 20,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => const Icon(
+                                    Icons.store,
+                                    size: 12,
+                                    color: AppColors.primaryColor,
+                                  ),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.store,
+                                size: 12,
+                                color: AppColors.primaryColor,
+                              ),
                       ),
                       const SizedBox(width: 6),
                       Expanded(

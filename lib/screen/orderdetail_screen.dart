@@ -200,6 +200,64 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  Future<void> _cancelOrder() async {
+    if (_orderId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Batalkan Pesanan'),
+        content: const Text('Apakah Anda yakin ingin membatalkan pesanan ini?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Tidak'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ya, Batalkan'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await OrderService.cancelOrder(_orderId!);
+      await _loadOrderData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text('Pesanan telah dibatalkan!'),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal membatalkan pesanan: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   void _continuePayment() {
     if (_orderData == null) return;
 
@@ -512,7 +570,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   _buildShippingCard(),
                   const SizedBox(height: 16),
                   _buildPaymentSummaryCard(),
-                  const SizedBox(height: 100), // Space for bottom buttons
+                  const SizedBox(height: 16), // Space for bottom buttons
                 ],
               ),
             ),
@@ -1338,6 +1396,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Cancel order button for pending payments
+            if (paymentStatus == 'pending') ...[
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: _cancelOrder,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: BorderSide(color: AppColors.error),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.cancel_outlined, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Batalkan Pesanan',
+                        style: TextStyle(
+                          fontFamily: 'SF Pro Display',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
             // Continue payment button for pending payments
             if (paymentStatus == 'pending') ...[
               SizedBox(
@@ -1675,7 +1767,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (paymentStatus == 'pending') {
       return 'Menunggu Pembayaran';
     } else if (paymentStatus == 'failed') {
-      return 'Pembayaran Gagal';
+      return 'Pembayaran Dibatalkan';
     } else {
       switch (status) {
         case 'processing':
@@ -1696,7 +1788,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (paymentStatus == 'pending') {
       return 'Silakan lanjutkan pembayaran untuk memproses pesanan Anda';
     } else if (paymentStatus == 'failed') {
-      return 'Pembayaran gagal diproses, silakan hubungi customer service';
+      return 'Pembayaran telah anda batalkan';
     } else {
       switch (status) {
         case 'processing':

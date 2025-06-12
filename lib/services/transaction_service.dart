@@ -165,6 +165,9 @@ class TransactionService {
         case 'COMPLETED':
           query = query.eq('status', 'delivered');
           break;
+        case 'CANCELLED':
+          query = query.eq('status', 'cancelled');
+          break;
         case 'FAILED':
           query = query.eq('payment_status', 'failed');
           break;
