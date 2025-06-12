@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import '../widgets/promo_card.dart';
-import '../services/promo_service.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/promo_model.dart';
+import '../services/promo_service.dart';
 
 class PromosOffersScreen extends StatefulWidget {
-  const PromosOffersScreen({Key? key}) : super(key: key);
+  const PromosOffersScreen({super.key});
 
   @override
   State<PromosOffersScreen> createState() => _PromosOffersScreenState();
@@ -21,97 +22,224 @@ class _PromosOffersScreenState extends State<PromosOffersScreen> {
   }
 
   Future<void> loadPromos() async {
-    final result = await PromoService.getActivePromos();
-    setState(() {
-      promos = result;
-      isLoading = false;
-    });
+    try {
+      final result = await PromoService.getActivePromos();
+      if (mounted) {
+        setState(() {
+          promos = result;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memuat promo: $e')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final List<Color> backgroundColors = [
-      Color(0xFFFF5D39),
-      Color(0xFFFF7043),
-      Color(0xFFFF8A65),
-      Color(0xFFFFA726),
-      Color(0xFFFFCA28),
-      Color(0xFFFFD54F),
-      Color(0xFFFFB74D),
+      const Color(0xFFFF5D39),
+      const Color(0xFFFF7043),
+      const Color(0xFFFF8A65),
+      const Color(0xFFFFA726),
+      const Color(0xFFFFCA28),
     ];
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      width: 45,
-                      height: 45,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFECECEC),
-                        borderRadius: BorderRadius.circular(9999),
-                      ),
-                      child: const Icon(Icons.arrow_back, color: Colors.black),
-                    ),
-                  ),
-                  const Spacer(),
-                  const Text(
-                    'Promos & Offers',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'SF Pro Display',
-                    ),
-                  ),
-                  const Spacer(flex: 2),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                      itemCount: promos.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 20),
-                      itemBuilder: (context, index) {
-                        final promo = promos[index];
-                        final color = backgroundColors[index % backgroundColors.length];
-
-                        // Format teks diskon
-                        String discountText = '';
-                        if (promo.discountType.toLowerCase() == 'percentage') {
-                          discountText = 'Up to ${promo.discountValue.toStringAsFixed(0)}% OFF';
-                        } else if (promo.discountType.toLowerCase() == 'nominal') {
-                          discountText = 'Up to Rp ${promo.discountValue.toStringAsFixed(0)} OFF';
-                        }
-
-                        return PromoCard(
-                          backgroundColor: color,
-                          discountPercentage: discountText,
-                          promoCode: promo.code,
-                          promoCodeColor: Colors.black,
-                          discountIcon: 'assets/images/icons/discount.png',
-                          vectorBackground: 'assets/images/icons/vector5.png',
-                          iconWidth: 190,
-                          iconHeight: 259,
-                          iconPosition: const Offset(-20, -27),
-                          iconOpacity: 1,
-                        );
-                      },
-                    ),
-            ),
-          ],
+      appBar: AppBar(
+        title: Text(
+          'Promos & Offers',
+          // [TIPOGRAFI] Ukuran dan ketebalan font disesuaikan
+          style: GoogleFonts.poppins(
+              color: Colors.black,
+              fontSize: 20,
+              fontWeight: FontWeight.w700),
         ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 1,
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : promos.isEmpty
+                ? Center(
+                    child: Text(
+                      'Tidak ada promo yang tersedia saat ini.',
+                      style: GoogleFonts.poppins(
+                          fontSize: 16, color: Colors.grey),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    itemCount: promos.length,
+                    itemBuilder: (context, index) {
+                      final promo = promos[index];
+                      final bgColor =
+                          backgroundColors[index % backgroundColors.length];
+                      final discountText = promo.discountType == 'percentage'
+                          ? '${promo.discountValue.toInt()}% OFF'
+                          : 'Rp ${promo.discountValue.toInt()} OFF';
+
+                      return Container(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              bgColor.withOpacity(0.9),
+                              bgColor.withOpacity(0.7)
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.3),
+                              spreadRadius: 2,
+                              blurRadius: 5,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  promo.title,
+                                  // [TIPOGRAFI] Ukuran diperbesar, tebal=semi-bold
+                                  style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  discountText,
+                                  // [TIPOGRAFI] Paling menonjol: besar dan extra-bold
+                                  style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  promo.description ?? '',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white70,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                InkWell(
+                                  onTap: () {
+                                    Clipboard.setData(
+                                        ClipboardData(text: promo.code));
+                                    ScaffoldMessenger.of(context)
+                                      ..hideCurrentSnackBar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Kode promo di copy!',
+                                          style: GoogleFonts.poppins(
+                                              color: Colors.white),
+                                        ),
+                                        backgroundColor:
+                                            Colors.black.withOpacity(0.85),
+                                        behavior: SnackBarBehavior.floating,
+                                        margin: const EdgeInsets.symmetric(
+                                            horizontal: 24, vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                          color: Colors.white.withOpacity(0.5),
+                                          width: 1.5),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.copy,
+                                            color: Colors.white, size: 18),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          promo.code,
+                                          // [TIPOGRAFI] Font lebih besar dan tebal
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 17,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'Min. Rp ${promo.minPurchase ~/ 1000}rb\n${_formatDate(promo.startDate ?? DateTime.now())} - ${_formatDate(promo.endDate ?? DateTime.now())}',
+                                  textAlign: TextAlign.right,
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                      );
+                    },
+                  ),
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    return '${date.day} ${monthNames[date.month - 1]}';
   }
 }
